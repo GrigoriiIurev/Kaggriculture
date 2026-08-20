@@ -117,14 +117,21 @@ def download_top_replays(
         raise ValueError("max_replays_per_player must be at least 1")
 
     executable, environment = _find_kaggle(kaggle_path)
+    print(f"[metadata] Reading the top {top_players} leaderboard teams...", flush=True)
     leaderboard = _leaderboard(
         executable, environment, competition=competition, count=top_players
     )
+    print(f"[metadata] Found {len(leaderboard)} teams.", flush=True)
 
     players: list[dict[str, Any]] = []
     all_episode_ids: set[int] = set()
     for rank, row in enumerate(leaderboard, start=1):
         team_id = int(row["teamId"])
+        team_name = str(row.get("teamName", team_id))
+        print(
+            f"[metadata {rank}/{len(leaderboard)}] {team_name}: reading submissions...",
+            flush=True,
+        )
         submissions_output = _run_kaggle(
             executable,
             environment,
@@ -153,6 +160,11 @@ def download_top_replays(
         for submission in submissions:
             submission_id = int(submission["id"])
             submission_ids.append(submission_id)
+            print(
+                f"[metadata {rank}/{len(leaderboard)}] {team_name}: "
+                f"reading episodes for submission {submission_id}...",
+                flush=True,
+            )
             episodes_output = _run_kaggle(
                 executable,
                 environment,
@@ -174,6 +186,11 @@ def download_top_replays(
             player_episodes,
             limit=max_replays_per_player,
         )
+        print(
+            f"[metadata {rank}/{len(leaderboard)}] {team_name}: "
+            f"selected {len(episode_ids)} public replays.",
+            flush=True,
+        )
         all_episode_ids.update(episode_ids)
         players.append(
             {
@@ -188,6 +205,11 @@ def download_top_replays(
 
     existing_ids = _existing_episode_ids(replay_directory)
     missing_ids = sorted(all_episode_ids - existing_ids)
+    print(
+        f"[metadata] Ready: {len(all_episode_ids)} unique replays, "
+        f"{len(missing_ids)} need downloading.",
+        flush=True,
+    )
     result: dict[str, Any] = {
         "competition": competition,
         "requested_top_players": top_players,

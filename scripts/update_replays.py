@@ -41,16 +41,26 @@ def _find_kaggle(explicit_path: str | None) -> tuple[Path, dict[str, str]]:
 
 
 def _run_kaggle(
-    executable: Path, environment: dict[str, str], arguments: list[str]
+    executable: Path,
+    environment: dict[str, str],
+    arguments: list[str],
+    timeout: int = 120,
 ) -> str:
     command = [str(executable), *arguments]
-    completed = subprocess.run(
-        command,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=environment,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"Kaggle CLI did not respond within {timeout} seconds: "
+            f"{' '.join(command)}"
+        ) from exc
     if completed.returncode != 0:
         detail = completed.stderr.strip() or completed.stdout.strip()
         raise RuntimeError(f"Kaggle CLI failed: {' '.join(command)}\n{detail}")
