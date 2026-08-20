@@ -1,0 +1,91 @@
+{
+  "name": "cow_heavy",
+  "config": {
+    "cash_reserve": 250,
+    "feed_days": 3,
+    "liquidation_steps": 48,
+    "last_animal_day": 18,
+    "max_market_orders": 10,
+    "max_animal_buys_per_turn": 2,
+    "regular_sell_slots": 3,
+    "seed_batch_per_crop": 5,
+    "inventory_return_threshold": 6,
+    "bootstrap_cows": 2,
+    "bootstrap_sheep": 3,
+    "growth_cows": 6,
+    "growth_sheep": 2,
+    "mature_cows": 10,
+    "mature_sheep": 2,
+    "first_land_day": 5,
+    "second_land_day": 9
+  },
+  "validation": {
+    "games": 8,
+    "wins": 8,
+    "losses": 0,
+    "ties": 0,
+    "win_rate": 1.0,
+    "mean_margin": 22832.5,
+    "median_margin": 21876.0,
+    "mean_candidate_reward": 51573.75,
+    "mean_baseline_reward": 28741.25,
+    "matches": [
+      {
+        "seed": 20000,
+        "candidate_seat": 0,
+        "candidate_reward": 65711.0,
+        "baseline_reward": 40827.0,
+        "margin": 24884.0
+      },
+      {
+        "seed": 20000,
+        "candidate_seat": 1,
+        "candidate_reward": 71210.0,
+        "baseline_reward": 42331.0,
+        "margin": 28879.0
+      },
+      {
+        "seed": 20001,
+        "candidate_seat": 0,
+        "candidate_reward": 62336.0,
+        "baseline_reward": 34104.0,
+        "margin": 28232.0
+      },
+      {
+        "seed": 20001,
+        "candidate_seat": 1,
+        "candidate_reward": 64359.0,
+        "baseline_reward": 34615.0,
+        "margin": 29744.0
+      },
+      {
+        "seed": 20002,
+        "candidate_seat": 0,
+        "candidate_reward": 38504.0,
+        "baseline_reward": 21972.0,
+        "margin": 16532.0
+      },
+      {
+        "seed": 20002,
+        "candidate_seat": 1,
+        "candidate_reward": 37751.0,
+        "baseline_reward": 20738.0,
+        "margin": 17013.0
+      },
+      {
+        "seed": 20003,
+        "candidate_seat": 0,
+        "candidate_reward": 34400.0,
+        "baseline_reward": 15892.0,
+        "margin": 18508.0
+      },
+      {
+        "seed": 20003,
+        "candidate_seat": 1,
+        "candidate_reward": 38319.0,
+        "baseline_reward": 19451.0,
+        "margin": 18868.0
+      }
+    ]
+  }
+}

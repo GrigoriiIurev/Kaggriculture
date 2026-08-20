@@ -1,0 +1,147 @@
+{
+  "model": "streaming_sgd_logistic_behavior_cloning",
+  "dataset": "/Users/grigorijurev/Public/Important Files/Practice Python/Kaggle/Kaggliculture/replay_dataset/worker_dataset.jsonl.gz",
+  "model_file": "models/worker_bc_unweighted.npz",
+  "feature_count": 6017,
+  "epochs": 3,
+  "batch_size": 512,
+  "alpha": 1e-05,
+  "seed": 17,
+  "balance_exponent": 0.0,
+  "train_operation_counts": {
+    "PASS": 2335,
+    "NORTH": 28150,
+    "SOUTH": 19263,
+    "EAST": 22040,
+    "WEST": 30257,
+    "PICKUP": 9057,
+    "PLACE": 429,
+    "DROP": 2198,
+    "PLANT": 859,
+    "WATER": 4671,
+    "HARVEST": 3226,
+    "BUILD_PASTURE": 419,
+    "FEED": 8425,
+    "COLLECT_FERTILIZER": 6850,
+    "CARE": 4099,
+    "DIG": 192
+  },
+  "train_argument_counts": {
+    "WHEAT": 8855,
+    "TOMATO": 41,
+    "STRAWBERRY": 29,
+    "MELON": 434,
+    "COW": 685,
+    "SHEEP": 301
+  },
+  "metrics": {
+    "holdout_worker_samples": 20380,
+    "operation_accuracy": 0.50633,
+    "operation_balanced_accuracy": 0.379647,
+    "argument_samples": 1488,
+    "argument_accuracy": 0.932796,
+    "argument_accuracy_given_true_operation": 0.94086,
+    "full_command_accuracy": 0.505201,
+    "farmer_full_accuracy": 0.502643,
+    "hand_full_accuracy": 0.505749,
+    "majority_operation_baseline": 0.211531,
+    "per_operation": {
+      "PASS": {
+        "support": 390,
+        "correct": 337,
+        "recall": 0.864103,
+        "predicted": 413
+      },
+      "NORTH": {
+        "support": 4003,
+        "correct": 1795,
+        "recall": 0.448414,
+        "predicted": 3211
+      },
+      "SOUTH": {
+        "support": 2706,
+        "correct": 1666,
+        "recall": 0.615669,
+        "predicted": 3472
+      },
+      "EAST": {
+        "support": 3199,
+        "correct": 1906,
+        "recall": 0.595811,
+        "predicted": 4878
+      },
+      "WEST": {
+        "support": 4311,
+        "correct": 2231,
+        "recall": 0.517513,
+        "predicted": 4220
+      },
+      "PICKUP": {
+        "support": 1305,
+        "correct": 1197,
+        "recall": 0.917241,
+        "predicted": 1686
+      },
+      "PLACE": {
+        "support": 60,
+        "correct": 4,
+        "recall": 0.066667,
+        "predicted": 27
+      },
+      "DROP": {
+        "support": 285,
+        "correct": 37,
+        "recall": 0.129825,
+        "predicted": 76
+      },
+      "PLANT": {
+        "support": 123,
+        "correct": 37,
+        "recall": 0.300813,
+        "predicted": 88
+      },
+      "WATER": {
+        "support": 656,
+        "correct": 267,
+        "recall": 0.407012,
+        "predicted": 554
+      },
+      "HARVEST": {
+        "support": 461,
+        "correct": 35,
+        "recall": 0.075922,
+        "predicted": 119
+      },
+      "BUILD_PASTURE": {
+        "support": 60,
+        "correct": 14,
+        "recall": 0.233333,
+        "predicted": 36
+      },
+      "FEED": {
+        "support": 1212,
+        "correct": 575,
+        "recall": 0.474422,
+        "predicted": 976
+      },
+      "COLLECT_FERTILIZER": {
+        "support": 977,
+        "correct": 118,
+        "recall": 0.120778,
+        "predicted": 330
+      },
+      "CARE": {
+        "support": 605,
+        "correct": 96,
+        "recall": 0.158678,
+        "predicted": 287
+      },
+      "DIG": {
+        "support": 27,
+        "correct": 4,
+        "recall": 0.148148,
+        "predicted": 7
+      }
+    }
+  }
+}

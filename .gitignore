@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+.env
+.env.*
+.ipynb_checkpoints/
+.kaggle/
+*.log
+
+# Large replay inputs and generated datasets.
+data/replays/
+data/processed/
+data/teacher_replays/*.json
+data/teacher_processed/
+
+# Generated reports and submission archives.
+artifacts/reports/
+artifacts/*.tar.gz

@@ -1,0 +1,267 @@
+{
+  "version": 3,
+  "architecture": "reward_weighted_class_balanced_multi_slot_bc",
+  "max_orders": 10,
+  "feature_count": 5900,
+  "epochs": 8,
+  "batch_size": 4096,
+  "seed": 17,
+  "episode_weighting": {
+    "method": "margin_rank_plus_outcome",
+    "episode_count": 42,
+    "minimum": 0.27999999999999997,
+    "maximum": 3.375,
+    "mean": 1.2807719328064362
+  },
+  "class_balancing": {
+    "method": "inverse_sqrt_frequency",
+    "minimum_weight": 0.75,
+    "maximum_weight": 4.0
+  },
+  "training": {
+    "epochs": [
+      {
+        "epoch": 1,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 2,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 3,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 4,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 5,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 6,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 7,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      },
+      {
+        "epoch": 8,
+        "turns": 30917,
+        "active_orders_per_slot": [
+          9531,
+          1985,
+          1276,
+          1072,
+          984,
+          975,
+          941,
+          894,
+          678,
+          351
+        ],
+        "mean_operation_weight": 1.4017546101800242
+      }
+    ]
+  },
+  "holdout": {
+    "turns": 5033,
+    "exact_operation_sequence_accuracy": 0.8227697198489966,
+    "slots": [
+      {
+        "slot": 0,
+        "operation_accuracy": 0.8611166302404133,
+        "active_operation_accuracy": 0.745361484325016,
+        "argument_accuracy": 0.719559585492228,
+        "quantity_mae": 0.9760362694300518,
+        "real_orders": 1563,
+        "true_active_rate": 0.3105503675740115,
+        "predicted_active_rate": 0.3004172461752434
+      },
+      {
+        "slot": 1,
+        "operation_accuracy": 0.9612557122988278,
+        "active_operation_accuracy": 0.4889589905362776,
+        "argument_accuracy": 0.3917910447761194,
+        "quantity_mae": 2.3171641791044775,
+        "real_orders": 317,
+        "true_active_rate": 0.06298430359626465,
+        "predicted_active_rate": 0.04351281541823962
+      },
+      {
+        "slot": 2,
+        "operation_accuracy": 0.980528511821975,
+        "active_operation_accuracy": 0.5445544554455446,
+        "argument_accuracy": 0.5402298850574713,
+        "quantity_mae": 2.954022988505747,
+        "real_orders": 202,
+        "true_active_rate": 0.04013510828531691,
+        "predicted_active_rate": 0.029604609576793166
+      },
+      {
+        "slot": 3,
+        "operation_accuracy": 0.9954301609378104,
+        "active_operation_accuracy": 0.8975903614457831,
+        "argument_accuracy": 0.4166666666666667,
+        "quantity_mae": 6.416666666666667,
+        "real_orders": 166,
+        "true_active_rate": 0.032982316709715874,
+        "predicted_active_rate": 0.031392807470693423
+      },
+      {
+        "slot": 4,
+        "operation_accuracy": 0.9956288495926883,
+        "active_operation_accuracy": 0.9032258064516129,
+        "argument_accuracy": 0.7777777777777778,
+        "quantity_mae": 0.2222222222222222,
+        "real_orders": 155,
+        "true_active_rate": 0.030796741506060005,
+        "predicted_active_rate": 0.030796741506060005
+      },
+      {
+        "slot": 5,
+        "operation_accuracy": 0.9958275382475661,
+        "active_operation_accuracy": 0.9084967320261438,
+        "argument_accuracy": 1.0,
+        "quantity_mae": 0.7,
+        "real_orders": 153,
+        "true_active_rate": 0.03039936419630439,
+        "predicted_active_rate": 0.03039936419630439
+      },
+      {
+        "slot": 6,
+        "operation_accuracy": 0.9940393403536658,
+        "active_operation_accuracy": 0.8733333333333333,
+        "argument_accuracy": 0.8461538461538461,
+        "quantity_mae": 0.6923076923076923,
+        "real_orders": 150,
+        "true_active_rate": 0.029803298231670973,
+        "predicted_active_rate": 0.030598052851182198
+      },
+      {
+        "slot": 7,
+        "operation_accuracy": 0.9940393403536658,
+        "active_operation_accuracy": 0.8741258741258742,
+        "argument_accuracy": 0.92,
+        "quantity_mae": 1.0,
+        "real_orders": 143,
+        "true_active_rate": 0.028412477647526326,
+        "predicted_active_rate": 0.02920723226703755
+      },
+      {
+        "slot": 8,
+        "operation_accuracy": 0.9892708126365984,
+        "active_operation_accuracy": 0.7767857142857143,
+        "argument_accuracy": 0.5882352941176471,
+        "quantity_mae": 0.6470588235294118,
+        "real_orders": 112,
+        "true_active_rate": 0.022253129346314324,
+        "predicted_active_rate": 0.026226902443870454
+      },
+      {
+        "slot": 9,
+        "operation_accuracy": 0.9854957281939202,
+        "active_operation_accuracy": 0.12903225806451613,
+        "argument_accuracy": 0.19047619047619047,
+        "quantity_mae": 0.9523809523809523,
+        "real_orders": 62,
+        "true_active_rate": 0.012318696602424002,
+        "predicted_active_rate": 0.008742300814623485
+      }
+    ]
+  }
+}

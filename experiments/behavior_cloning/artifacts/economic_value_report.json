@@ -1,0 +1,324 @@
+{
+  "version": 3,
+  "architecture": "linear_state_action_value_with_hashed_interactions",
+  "dataset": "replay_dataset/economic_value_dataset.jsonl.gz",
+  "model": "models/economic_value.npz",
+  "total_feature_count": 16140,
+  "target_scale": 1000.0,
+  "epochs": 20,
+  "learning_rate": 0.01,
+  "l2": 2e-05,
+  "checkpoint_selection": {
+    "metric": "holdout_margin_correlation",
+    "tie_breaker": "holdout_episode_correlation",
+    "best_epoch": 3,
+    "best_holdout_correlation": 0.3977293977118805,
+    "best_episode_correlation": 0.7568848126582771,
+    "best_holdout_metrics": {
+      "examples": 5033,
+      "transformed_rmse": 6.956378982785263,
+      "margin_mae": 1823131.23354873,
+      "margin_median_ae": 47123.47153325757,
+      "margin_correlation": 0.3977293977118805,
+      "episode_correlation": 0.7568848126582771
+    }
+  },
+  "epoch_history": [
+    {
+      "epoch": 1,
+      "learning_rate": 0.01,
+      "train_rmse": 9.315201224999175,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 6.734113229159203,
+        "margin_mae": 1378634.5385207161,
+        "margin_median_ae": 48933.18193861161,
+        "margin_correlation": 0.07493745792400539,
+        "episode_correlation": 0.20309996503347608
+      },
+      "is_best": true
+    },
+    {
+      "epoch": 2,
+      "learning_rate": 0.0070710678118654745,
+      "train_rmse": 6.3503083304279055,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 7.223125485732255,
+        "margin_mae": 1735670.0225623003,
+        "margin_median_ae": 40246.83088765222,
+        "margin_correlation": -0.048394167065333366,
+        "episode_correlation": -0.15422572095750098
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 3,
+      "learning_rate": 0.005773502691896258,
+      "train_rmse": 4.8920255757875175,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 6.956378982785263,
+        "margin_mae": 1823131.23354873,
+        "margin_median_ae": 47123.47153325757,
+        "margin_correlation": 0.3977293977118805,
+        "episode_correlation": 0.7568848126582771
+      },
+      "is_best": true
+    },
+    {
+      "epoch": 4,
+      "learning_rate": 0.005,
+      "train_rmse": 4.025457710107236,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 4.1980580661260065,
+        "margin_mae": 325361.9412210414,
+        "margin_median_ae": 21940.573639346978,
+        "margin_correlation": 0.06403370832108053,
+        "episode_correlation": 0.34179892061492484
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 5,
+      "learning_rate": 0.004472135954999579,
+      "train_rmse": 3.458070701918097,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 5.1638505651090725,
+        "margin_mae": 593966.9128217731,
+        "margin_median_ae": 32239.70473705508,
+        "margin_correlation": 0.056417472908733945,
+        "episode_correlation": 0.15331634041752992
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 6,
+      "learning_rate": 0.004082482904638631,
+      "train_rmse": 3.0260760411320593,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 4.2978451543595595,
+        "margin_mae": 148780.60142949977,
+        "margin_median_ae": 18964.30765628846,
+        "margin_correlation": 0.018153399873156246,
+        "episode_correlation": 0.09264960171713355
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 7,
+      "learning_rate": 0.003779644730092272,
+      "train_rmse": 2.6744797849832844,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.5993617441682493,
+        "margin_mae": 97148.73216283722,
+        "margin_median_ae": 15916.671570587461,
+        "margin_correlation": 0.06456638284178651,
+        "episode_correlation": 0.35886325427503657
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 8,
+      "learning_rate": 0.0035355339059327372,
+      "train_rmse": 2.4291138929486222,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.539408290604552,
+        "margin_mae": 124316.77789598747,
+        "margin_median_ae": 17782.09656243185,
+        "margin_correlation": 0.039266865632746256,
+        "episode_correlation": 0.2179778649076139
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 9,
+      "learning_rate": 0.0033333333333333335,
+      "train_rmse": 2.1868943347106438,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.6908664652986514,
+        "margin_mae": 67914.31297921558,
+        "margin_median_ae": 16341.74877666901,
+        "margin_correlation": 0.057080937216233,
+        "episode_correlation": 0.3401706639575095
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 10,
+      "learning_rate": 0.0031622776601683794,
+      "train_rmse": 2.0010450219127076,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.51724379210671,
+        "margin_mae": 86969.04030592469,
+        "margin_median_ae": 15422.660861624567,
+        "margin_correlation": 0.0916268259973418,
+        "episode_correlation": 0.4170465815734143
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 11,
+      "learning_rate": 0.0030151134457776364,
+      "train_rmse": 1.8578666967367892,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.3293542267526393,
+        "margin_mae": 89522.98942323685,
+        "margin_median_ae": 15579.65076520329,
+        "margin_correlation": 0.07697123451221749,
+        "episode_correlation": 0.5901802893374877
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 12,
+      "learning_rate": 0.002886751345948129,
+      "train_rmse": 1.7225163008028048,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.376213325661448,
+        "margin_mae": 48984.85961988493,
+        "margin_median_ae": 15759.482610134157,
+        "margin_correlation": 0.10077880359832368,
+        "episode_correlation": 0.5844482298632476
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 13,
+      "learning_rate": 0.002773500981126146,
+      "train_rmse": 1.627208230517638,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.4517362533813105,
+        "margin_mae": 60148.04474999545,
+        "margin_median_ae": 16062.776964375125,
+        "margin_correlation": 0.04261194318201276,
+        "episode_correlation": 0.20952469091791381
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 14,
+      "learning_rate": 0.002672612419124244,
+      "train_rmse": 1.526006805893208,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.5348830072690376,
+        "margin_mae": 69314.50100279602,
+        "margin_median_ae": 16438.325509948765,
+        "margin_correlation": 0.07793250717674144,
+        "episode_correlation": 0.34750826511929944
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 15,
+      "learning_rate": 0.0025819888974716113,
+      "train_rmse": 1.4619142351269012,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 4.84910292894476,
+        "margin_mae": 494865.76980160864,
+        "margin_median_ae": 36121.87424822585,
+        "margin_correlation": 0.04469775823558063,
+        "episode_correlation": 0.17900653228728938
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 16,
+      "learning_rate": 0.0025,
+      "train_rmse": 1.402190158946675,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.3218778167683856,
+        "margin_mae": 31408.781920693702,
+        "margin_median_ae": 14348.610616043468,
+        "margin_correlation": 0.06060755980848586,
+        "episode_correlation": 0.48019158641428433
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 17,
+      "learning_rate": 0.00242535625036333,
+      "train_rmse": 1.3263157464672901,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.404667052786503,
+        "margin_mae": 63553.435083484146,
+        "margin_median_ae": 17065.754580773104,
+        "margin_correlation": 0.07995608286547141,
+        "episode_correlation": 0.46016319846432957
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 18,
+      "learning_rate": 0.0023570226039551587,
+      "train_rmse": 1.2912496130934747,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.6139800814745713,
+        "margin_mae": 94954.81088726471,
+        "margin_median_ae": 17699.710832109937,
+        "margin_correlation": 0.036932722966289425,
+        "episode_correlation": 0.20942541081831775
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 19,
+      "learning_rate": 0.0022941573387056176,
+      "train_rmse": 1.2602864112413112,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.2728308622607893,
+        "margin_mae": 42509.185017537624,
+        "margin_median_ae": 15821.623904336668,
+        "margin_correlation": 0.10069321593251705,
+        "episode_correlation": 0.5956659764082404
+      },
+      "is_best": false
+    },
+    {
+      "epoch": 20,
+      "learning_rate": 0.0022360679774997894,
+      "train_rmse": 1.2115599763808016,
+      "holdout": {
+        "examples": 5033,
+        "transformed_rmse": 3.4363886559342736,
+        "margin_mae": 81122.77676216041,
+        "margin_median_ae": 15923.109611521244,
+        "margin_correlation": 0.10016928404764952,
+        "episode_correlation": 0.31532335856385496
+      },
+      "is_best": false
+    }
+  ],
+  "train": {
+    "examples": 30917,
+    "transformed_rmse": 7.302095968073006,
+    "margin_mae": 4006119.387228062,
+    "margin_median_ae": 647179.0923239021,
+    "margin_correlation": 0.5422193314079545,
+    "episode_correlation": 0.8543524784652528
+  },
+  "holdout": {
+    "examples": 5033,
+    "transformed_rmse": 6.956378982785263,
+    "margin_mae": 1823131.23354873,
+    "margin_median_ae": 47123.47153325757,
+    "margin_correlation": 0.3977293977118805,
+    "episode_correlation": 0.7568848126582771
+  }
+}

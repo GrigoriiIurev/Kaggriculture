@@ -1,0 +1,82 @@
+{
+  "agent_a": "ml_agent.py",
+  "agent_b": "behavior_agent.py",
+  "episode_steps": 720,
+  "summary": {
+    "games": 4,
+    "wins_a": 0,
+    "wins_b": 4,
+    "ties": 0,
+    "win_rate_a": 0.0,
+    "average_reward_a": 245.0,
+    "average_reward_b": 758.25,
+    "median_reward_a": 264.0,
+    "median_reward_b": 759.0,
+    "average_margin_a": -513.25,
+    "median_margin_a": -499.0,
+    "agent_a_as_player_0": {
+      "games": 2,
+      "wins": 0,
+      "losses": 2,
+      "ties": 0,
+      "average_reward": 199.0,
+      "average_margin": -604.0
+    },
+    "agent_a_as_player_1": {
+      "games": 2,
+      "wins": 0,
+      "losses": 2,
+      "ties": 0,
+      "average_reward": 291.0,
+      "average_margin": -422.5
+    },
+    "average_game_seconds": 8.88225013524061
+  },
+  "total_elapsed_seconds": 35.57025333296042,
+  "games": [
+    {
+      "game": 1,
+      "agent_a_player": 0,
+      "reward_a": 103.0,
+      "reward_b": 799.0,
+      "margin_a": -696.0,
+      "winner": "B",
+      "status_a": "DONE",
+      "status_b": "DONE",
+      "elapsed_seconds": 9.638264457986224
+    },
+    {
+      "game": 2,
+      "agent_a_player": 1,
+      "reward_a": 233.0,
+      "reward_b": 719.0,
+      "margin_a": -486.0,
+      "winner": "B",
+      "status_a": "DONE",
+      "status_b": "DONE",
+      "elapsed_seconds": 8.644309207971673
+    },
+    {
+      "game": 3,
+      "agent_a_player": 0,
+      "reward_a": 295.0,
+      "reward_b": 807.0,
+      "margin_a": -512.0,
+      "winner": "B",
+      "status_a": "DONE",
+      "status_b": "DONE",
+      "elapsed_seconds": 8.749867625010666
+    },
+    {
+      "game": 4,
+      "agent_a_player": 1,
+      "reward_a": 349.0,
+      "reward_b": 708.0,
+      "margin_a": -359.0,
+      "winner": "B",
+      "status_a": "DONE",
+      "status_b": "DONE",
+      "elapsed_seconds": 8.49655924999388
+    }
+  ]
+}

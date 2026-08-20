@@ -1,0 +1,8 @@
+{
+  "holdout_episodes": 5,
+  "holdout_transition_groups": 3595,
+  "holdout_worker_samples": 20380,
+  "masked_operation_accuracy": 0.546222,
+  "masked_full_command_accuracy": 0.545142,
+  "ground_truth_commands_excluded_by_mask": 0
+}
