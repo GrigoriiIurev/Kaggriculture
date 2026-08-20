@@ -11,7 +11,15 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, TextIO
 
-from src.kaggriculture.core.action_codec import ActionEncoder, WORKER_OPERATIONS
+from src.kaggriculture.core.action_codec import (
+    ARGUMENT_TO_ID,
+    WORKER_ITEM_OPERATIONS,
+    WORKER_NO_ARGUMENT_OPERATIONS,
+    WORKER_OPERATION_TO_ID,
+    WORKER_OPERATIONS,
+    ActionEncoder,
+)
+from src.kaggriculture.core.game_data import CROP_SPECS
 from src.kaggriculture.data.feature_extractor import FeatureExtractor, INVENTORY_ITEMS, SparseFeatures
 from src.kaggriculture.core.state_parser import GameState, parse_observation
 
@@ -163,6 +171,7 @@ def build_worker_dataset(
     split_groups: Counter[str] = Counter()
     split_workers: Counter[str] = Counter()
     operation_counts: Counter[str] = Counter()
+    normalized_commands = 0
 
     with _open_text(transitions_path, "rt") as source, _open_text(
         output_path, "wt"
@@ -173,17 +182,40 @@ def build_worker_dataset(
                 observation = transition["observation"]
                 state = parse_observation(observation)
                 base_features = feature_extractor.base.extract(state)
-                encoded = action_encoder.encode_action(
-                    transition["action"], expected_hands=len(state.me.hands)
+                raw_action = transition["action"]
+                if not isinstance(raw_action, dict):
+                    raise ValueError("action must be a mapping")
+                raw_farmer = raw_action.get("farmer", ["PASS"])
+                raw_hands = raw_action.get("hands", [])
+                if not isinstance(raw_hands, (list, tuple)):
+                    raw_hands = []
+                normalized_farmer = _normalize_recorded_worker_command(raw_farmer)
+                normalized_hands = [
+                    _normalize_recorded_worker_command(command)
+                    for command in raw_hands[: len(state.me.hands)]
+                ]
+                normalized_hands.extend(
+                    [["PASS"]] * (len(state.me.hands) - len(normalized_hands))
+                )
+                normalized_commands += int(
+                    _recorded_command_changed(raw_farmer, normalized_farmer)
+                )
+                normalized_commands += sum(
+                    _recorded_command_changed(raw, clean)
+                    for raw, clean in zip(raw_hands, normalized_hands)
+                )
+                normalized_commands += abs(len(raw_hands) - len(state.me.hands))
+                encoded_farmer = action_encoder.encode_worker(normalized_farmer)
+                encoded_hands = tuple(
+                    action_encoder.encode_worker(command)
+                    for command in normalized_hands
                 )
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 raise ValueError(f"Invalid transition on line {line_number}: {exc}") from exc
 
-            commands = (encoded.farmer, *encoded.hands)
-            raw_commands = (
-                transition["action"]["farmer"],
-                *transition["action"]["hands"],
-            )
+            commands = (encoded_farmer, *encoded_hands)
+            raw_commands = (raw_farmer, *raw_hands[: len(state.me.hands)])
+            raw_commands += (["PASS"],) * (len(commands) - len(raw_commands))
             workers = []
             for worker_index, (target, raw_target) in enumerate(
                 zip(commands, raw_commands)
@@ -241,10 +273,41 @@ def build_worker_dataset(
         "split_groups": dict(split_groups),
         "split_worker_samples": dict(split_workers),
         "operation_counts": dict(operation_counts.most_common()),
+        "normalized_recorded_commands": normalized_commands,
         "future_outcome_is_not_an_input_feature": True,
     }
     _write_json(manifest_path, manifest)
     return manifest
+
+
+def _normalize_recorded_worker_command(command: Any) -> list[Any]:
+    """Mirror the game engine's permissive handling of recorded commands."""
+
+    if not isinstance(command, (list, tuple)) or not command:
+        return ["PASS"]
+    operation = str(command[0]).upper()
+    if operation in WORKER_NO_ARGUMENT_OPERATIONS:
+        return [operation]
+    if operation == "PLANT":
+        if len(command) >= 2 and str(command[1]).upper() in CROP_SPECS:
+            return [operation, str(command[1]).upper()]
+        return ["PASS"]
+    if operation in WORKER_ITEM_OPERATIONS and len(command) >= 2:
+        argument = str(command[1]).upper()
+        if argument not in ARGUMENT_TO_ID:
+            return ["PASS"]
+        try:
+            quantity = int(command[2]) if len(command) >= 3 else 1
+        except (TypeError, ValueError):
+            return ["PASS"]
+        if quantity <= 0:
+            return ["PASS"]
+        return [operation, argument, quantity]
+    return ["PASS"]
+
+
+def _recorded_command_changed(raw: Any, normalized: list[Any]) -> bool:
+    return not isinstance(raw, (list, tuple)) or list(raw) != normalized
 
 
 def _open_text(path: Path, mode: str) -> TextIO:

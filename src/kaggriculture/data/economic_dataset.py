@@ -12,8 +12,11 @@ from typing import Any, TextIO
 
 from src.kaggriculture.core.action_codec import (
     ARGUMENTS,
+    ARGUMENT_TO_ID,
     MARKET_OPERATIONS,
+    MARKET_NO_ARGUMENT_OPERATIONS,
     ActionEncoder,
+    ActionEncodingError,
 )
 
 
@@ -23,7 +26,7 @@ DEFAULT_MAX_MARKET_ORDERS = 10
 
 def _open_text(path: Path, mode: str) -> TextIO:
     if path.suffix == ".gz":
-        return gzip.open(path, mode, encoding="utf-8", compresslevel=6)
+        return gzip.open(path, mode, encoding="utf-8", compresslevel=1)
     return path.open(mode, encoding="utf-8")
 
 
@@ -103,7 +106,13 @@ def _encode_market_orders(
     encoded_orders: list[dict[str, Any]] = []
 
     for order_index, raw_order in enumerate(raw_market):
-        encoded = encoder.encode_market(raw_order)
+        normalized = _normalize_recorded_market_order(raw_order)
+        if normalized is None:
+            continue
+        try:
+            encoded = encoder.encode_market(normalized)
+        except ActionEncodingError:
+            continue
 
         encoded_orders.append(
             {
@@ -116,6 +125,30 @@ def _encode_market_orders(
         )
 
     return encoded_orders
+
+
+def _normalize_recorded_market_order(order: Any) -> list[Any] | None:
+    """Keep only the portion of an order that the game engine executes."""
+
+    if not isinstance(order, (list, tuple)) or not order:
+        return None
+    operation = str(order[0]).upper()
+    if operation in MARKET_NO_ARGUMENT_OPERATIONS:
+        return [operation]
+    if operation not in {"BUY_SEED", "BUY_PRODUCT", "BUY_ANIMAL", "SELL"}:
+        return None
+    if len(order) < 3:
+        return None
+    argument = str(order[1]).upper()
+    if argument not in ARGUMENT_TO_ID:
+        return None
+    try:
+        quantity = int(order[2])
+    except (TypeError, ValueError):
+        return None
+    if quantity <= 0:
+        return None
+    return [operation, argument, quantity]
 
 
 def _empty_market_target() -> dict[str, Any]:
@@ -319,6 +352,9 @@ def build_economic_dataset(
 
                 order_count += 1
                 split_orders[split] += 1
+
+            if row_count % 10_000 == 0:
+                print(f"[economics] {row_count:,} rows processed", flush=True)
 
     schema = {
         "version": 1,

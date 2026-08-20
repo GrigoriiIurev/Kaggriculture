@@ -31,6 +31,11 @@ def main() -> None:
         action="store_true",
         help="Reuse a completed transitions.jsonl.gz instead of parsing replays again",
     )
+    parser.add_argument(
+        "--reuse-features",
+        action="store_true",
+        help="Reuse a completed features.jsonl.gz instead of extracting features again",
+    )
     args = parser.parse_args()
 
     transition_path = OUTPUT_DIRECTORY / "transitions.jsonl.gz"
@@ -59,14 +64,30 @@ def main() -> None:
             "No teacher trajectories passed the filters; check manifest.json "
             "or lower --minimum-steps/--minimum-reward."
         )
+    print(
+        f"[dataset] {int(transitions['transitions']):,} transitions total",
+        flush=True,
+    )
 
     if not args.worker_only:
-        print("[2/4 teacher features] started", flush=True)
-        features = build_feature_dataset(
-            transition_path,
-            OUTPUT_DIRECTORY / "features.jsonl.gz",
-        )
-        print("[2/4 teacher features] complete", flush=True)
+        feature_path = OUTPUT_DIRECTORY / "features.jsonl.gz"
+        feature_manifest_path = OUTPUT_DIRECTORY / "feature_manifest.json"
+        if args.reuse_features:
+            if not feature_path.is_file() or not feature_manifest_path.is_file():
+                raise RuntimeError(
+                    "Cannot reuse features: features.jsonl.gz or "
+                    "feature_manifest.json is missing"
+                )
+            with feature_manifest_path.open(encoding="utf-8") as source:
+                features = json.load(source)
+            print("[2/4 teacher features] reused", flush=True)
+        else:
+            print("[2/4 teacher features] started", flush=True)
+            features = build_feature_dataset(
+                transition_path,
+                feature_path,
+            )
+            print("[2/4 teacher features] complete", flush=True)
 
     worker_stage = "2/2" if args.worker_only else "3/4"
     print(f"[{worker_stage} teacher workers] started", flush=True)

@@ -159,6 +159,39 @@ class WorkerDatasetTests(unittest.TestCase):
         )
         self.assertEqual(action_schema["worker_operations"][0], "PASS")
 
+    def test_normalizes_extra_arguments_accepted_by_game_engine(self):
+        transition = {
+            "episode_id": 123457,
+            "episode_type": "public",
+            "seat": 0,
+            "step": 10,
+            "observation": _observation(),
+            "next_observation": _observation(step=11),
+            "action": {
+                "farmer": ["PASS", "IGNORED"],
+                "hands": [["FEED", "WHEAT"]],
+                "market": [],
+            },
+            "final_reward": 100,
+            "margin": 20,
+            "outcome": "win",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "transitions.jsonl.gz"
+            output = Path(directory) / "worker_dataset.jsonl.gz"
+            with gzip.open(source, "wt", encoding="utf-8") as stream:
+                stream.write(json.dumps(transition) + "\n")
+
+            manifest = build_worker_dataset(source, output, board_size=2)
+            with gzip.open(output, "rt", encoding="utf-8") as stream:
+                record = json.loads(stream.readline())
+
+        self.assertEqual(manifest["normalized_recorded_commands"], 2)
+        self.assertEqual(
+            record["workers"][1]["target"]["operation_id"],
+            WORKER_OPERATION_TO_ID["FEED"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
