@@ -172,7 +172,7 @@ def build_worker_dataset(
                 transition = json.loads(line)
                 observation = transition["observation"]
                 state = parse_observation(observation)
-                base_features = feature_extractor.base.extract(observation)
+                base_features = feature_extractor.base.extract(state)
                 encoded = action_encoder.encode_action(
                     transition["action"], expected_hands=len(state.me.hands)
                 )
@@ -221,6 +221,12 @@ def build_worker_dataset(
             worker_count += len(workers)
             split_groups[split] += 1
             split_workers[split] += len(workers)
+            if group_count % 10_000 == 0:
+                print(
+                    f"[workers] {group_count:,} transitions, "
+                    f"{worker_count:,} worker samples",
+                    flush=True,
+                )
 
     _write_json(schema_path, feature_extractor.schema())
     _write_json(action_schema_path, action_encoder.schema())
@@ -243,7 +249,7 @@ def build_worker_dataset(
 
 def _open_text(path: Path, mode: str) -> TextIO:
     if path.suffix == ".gz":
-        return gzip.open(path, mode, encoding="utf-8", compresslevel=6)
+        return gzip.open(path, mode, encoding="utf-8", compresslevel=1)
     return path.open(mode, encoding="utf-8")
 
 

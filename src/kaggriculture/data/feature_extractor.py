@@ -173,7 +173,11 @@ class FeatureExtractor:
     def extract(
         self, observation: Any, configuration: Any | None = None
     ) -> SparseFeatures:
-        state = parse_observation(observation, configuration)
+        state = (
+            observation
+            if isinstance(observation, GameState)
+            else parse_observation(observation, configuration)
+        )
         self._validate_board(state)
         values: dict[int, float] = {}
 
@@ -443,7 +447,7 @@ def _market_scale(value: int) -> float:
 
 def _open_text(path: Path, mode: str) -> TextIO:
     if path.suffix == ".gz":
-        return gzip.open(path, mode, encoding="utf-8", compresslevel=6)
+        return gzip.open(path, mode, encoding="utf-8", compresslevel=1)
     return path.open(mode, encoding="utf-8")
 
 
@@ -466,13 +470,30 @@ def build_feature_dataset(
     extractor = FeatureExtractor(board_size=board_size)
     record_count = 0
     nonzero_counts: list[int] = []
+    cached_key: tuple[int, int, int] | None = None
+    cached_features: SparseFeatures | None = None
 
     with _open_text(transitions_path, "rt") as source, _open_text(output_path, "wt") as output:
         for line_number, line in enumerate(source, start=1):
             try:
                 transition = json.loads(line)
-                features = extractor.extract(transition["observation"])
+                current_key = (
+                    int(transition["episode_id"]),
+                    int(transition["seat"]),
+                    int(transition["step"]),
+                )
+                features = (
+                    cached_features
+                    if cached_key == current_key and cached_features is not None
+                    else extractor.extract(transition["observation"])
+                )
                 next_features = extractor.extract(transition["next_observation"])
+                cached_key = (
+                    current_key[0],
+                    current_key[1],
+                    int(transition["next_observation"]["step"]),
+                )
+                cached_features = next_features
             except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                 raise ValueError(f"Invalid transition on line {line_number}: {exc}") from exc
             record = {
@@ -497,6 +518,8 @@ def build_feature_dataset(
             output.write("\n")
             record_count += 1
             nonzero_counts.extend((len(features.indices), len(next_features.indices)))
+            if record_count % 10_000 == 0:
+                print(f"[features] {record_count:,} transitions processed", flush=True)
 
     schema = extractor.schema()
     with schema_path.open("w", encoding="utf-8") as output:
