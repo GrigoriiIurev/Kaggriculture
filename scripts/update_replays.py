@@ -11,9 +11,6 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from src.kaggriculture.data.pipeline import build_all_datasets
-
-
 DEFAULT_SUBMISSION_ID = 55562698
 DEFAULT_TEAM = "Grigorii IU"
 
@@ -151,6 +148,8 @@ def update_replays(
         for filename in ("transitions.jsonl.gz", "features.jsonl.gz")
     )
     if missing_ids or force_rebuild or not dataset_files_exist:
+        from src.kaggriculture.data.pipeline import build_all_datasets
+
         manifests = build_all_datasets(replay_directory, dataset_directory, team)
         result["dataset_rebuilt"] = True
         result["manifests"] = manifests
