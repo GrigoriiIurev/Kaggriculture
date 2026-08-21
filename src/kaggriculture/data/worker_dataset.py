@@ -189,9 +189,9 @@ def build_worker_dataset(
                 raw_hands = raw_action.get("hands", [])
                 if not isinstance(raw_hands, (list, tuple)):
                     raw_hands = []
-                normalized_farmer = _normalize_recorded_worker_command(raw_farmer)
+                normalized_farmer = normalize_recorded_worker_command(raw_farmer)
                 normalized_hands = [
-                    _normalize_recorded_worker_command(command)
+                    normalize_recorded_worker_command(command)
                     for command in raw_hands[: len(state.me.hands)]
                 ]
                 normalized_hands.extend(
@@ -280,7 +280,7 @@ def build_worker_dataset(
     return manifest
 
 
-def _normalize_recorded_worker_command(command: Any) -> list[Any]:
+def normalize_recorded_worker_command(command: Any) -> list[Any]:
     """Mirror the game engine's permissive handling of recorded commands."""
 
     if not isinstance(command, (list, tuple)) or not command:

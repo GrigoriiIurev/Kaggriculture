@@ -15,7 +15,10 @@ from src.kaggriculture.core.legal_actions import (
     legal_worker_operations,
 )
 from src.kaggriculture.core.state_parser import parse_observation
-from src.kaggriculture.data.worker_dataset import episode_split
+from src.kaggriculture.data.worker_dataset import (
+    episode_split,
+    normalize_recorded_worker_command,
+)
 
 
 def evaluate_policy(
@@ -48,9 +51,21 @@ def evaluate_policy(
             episodes.add(episode_id)
             state = parse_observation(transition["observation"])
             predictions = policy.predict_commands(transition["observation"])
-            targets = (
-                transition["action"]["farmer"],
-                *transition["action"]["hands"],
+            raw_action = transition["action"]
+            raw_hands = raw_action.get("hands", [])
+            if not isinstance(raw_hands, (list, tuple)):
+                raw_hands = []
+            targets = [
+                normalize_recorded_worker_command(
+                    raw_action.get("farmer", ["PASS"])
+                ),
+                *(
+                    normalize_recorded_worker_command(command)
+                    for command in raw_hands[: len(state.me.hands)]
+                ),
+            ]
+            targets.extend(
+                [["PASS"]] * (len(predictions) - len(targets))
             )
             for worker_index, (target, prediction) in enumerate(
                 zip(targets, predictions)

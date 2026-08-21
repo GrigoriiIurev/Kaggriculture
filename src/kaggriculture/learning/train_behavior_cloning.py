@@ -494,14 +494,6 @@ def train_behavior_cloning(
         argument_model,
         quantity_model,
     )
-    from .evaluate_behavior_policy import evaluate_policy
-
-    policy_metrics = evaluate_policy(transitions_path, model_path)
-    policy_report_path = Path(policy_report_path)
-    policy_report_path.parent.mkdir(parents=True, exist_ok=True)
-    with policy_report_path.open("w", encoding="utf-8") as output:
-        json.dump(policy_metrics, output, ensure_ascii=True, indent=2)
-        output.write("\n")
     report = {
         "model": "streaming_sgd_logistic_behavior_cloning",
         "dataset": str(Path(dataset_path).resolve()),
@@ -521,10 +513,23 @@ def train_behavior_cloning(
             for quantity, count in sorted(labels["quantities"].items())
         },
         "metrics": metrics,
-        "masked_policy_metrics": policy_metrics,
+        "masked_policy_metrics": None,
     }
     report_path = Path(report_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
+    with report_path.open("w", encoding="utf-8") as output:
+        json.dump(report, output, ensure_ascii=True, indent=2)
+        output.write("\n")
+
+    from .evaluate_behavior_policy import evaluate_policy
+
+    policy_metrics = evaluate_policy(transitions_path, model_path)
+    policy_report_path = Path(policy_report_path)
+    policy_report_path.parent.mkdir(parents=True, exist_ok=True)
+    with policy_report_path.open("w", encoding="utf-8") as output:
+        json.dump(policy_metrics, output, ensure_ascii=True, indent=2)
+        output.write("\n")
+    report["masked_policy_metrics"] = policy_metrics
     with report_path.open("w", encoding="utf-8") as output:
         json.dump(report, output, ensure_ascii=True, indent=2)
         output.write("\n")

@@ -3,11 +3,13 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from src.kaggriculture.core.action_codec import WORKER_OPERATION_TO_ID
 from src.kaggriculture.core.legal_actions import legal_worker_arguments, legal_worker_operations
 from src.kaggriculture.core.state_parser import parse_observation
 from src.kaggriculture.data.worker_dataset import WorkerFeatureExtractor, build_worker_dataset, episode_split
+from src.kaggriculture.learning.evaluate_behavior_policy import evaluate_policy
 
 
 def _farm(money, farmer, hands):
@@ -45,6 +47,33 @@ def _observation(step=10):
 
 
 class WorkerDatasetTests(unittest.TestCase):
+    def test_policy_evaluation_normalizes_permissive_replay_commands(self):
+        episode_id = next(
+            value for value in range(1, 1_000) if episode_split(value) == "holdout"
+        )
+        transition = {
+            "episode_id": episode_id,
+            "observation": _observation(),
+            "action": {
+                "farmer": ["FEED", "WHEAT"],
+                "hands": [["PASS", "IGNORED"]],
+            },
+        }
+        policy = Mock()
+        policy.predict_commands.return_value = (["PASS"], ["PASS"])
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "transitions.jsonl.gz"
+            with gzip.open(source, "wt", encoding="utf-8") as output:
+                output.write(json.dumps(transition) + "\n")
+            with patch(
+                "src.kaggriculture.learning.evaluate_behavior_policy."
+                "BehaviorCloningPolicy",
+                return_value=policy,
+            ):
+                report = evaluate_policy(source, "unused.npz")
+
+        self.assertEqual(report["holdout_worker_samples"], 2)
+
     def test_legal_mask_requires_an_item_before_pickup(self):
         raw = _observation()
         raw["private"]["shed"] = {}
