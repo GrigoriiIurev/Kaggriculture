@@ -82,10 +82,18 @@ def evaluate_selector(
         observation, reset_info = environment.reset(seed=game // 2)
         done = False
         info: dict[str, Any] = reset_info
+        game_steps = 0
         while not done:
             choice = int(selector(observation))
             candidate_counts[choice] += 1
             observation, _, done, _, info = environment.step(choice)
+            game_steps += 1
+            if game_steps % 120 == 0 and not done:
+                print(
+                    f"[evaluate game {game + 1}/{games}] "
+                    f"turn {game_steps}/{episode_steps}",
+                    flush=True,
+                )
         outcome = int(info["outcome"])
         wins += outcome > 0
         ties += outcome == 0
@@ -110,14 +118,19 @@ def evaluate_selector(
 
 
 def train(args: argparse.Namespace) -> dict[str, Any]:
+    if args.log_every_steps <= 0:
+        raise ValueError("log_every_steps must be positive")
+    print("[setup] Loading PyTorch and Stable-Baselines3...", flush=True)
     try:
         import torch
         from stable_baselines3 import PPO
+        from stable_baselines3.common.callbacks import BaseCallback
         from stable_baselines3.common.vec_env import DummyVecEnv
     except ImportError as exc:  # pragma: no cover - exercised in Colab
         raise ImportError("Install requirements-rl.txt before training") from exc
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    print("[setup] RL libraries loaded", flush=True)
     probe = KaggricultureMetaEnv(args.expert, episode_steps=args.episode_steps)
     feature_count = probe.observation_space.shape[0]
     best_numpy = args.output_dir / "best_meta_policy.npz"
@@ -188,6 +201,22 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             seed=args.model_seed,
         )
 
+    class TrainingProgressCallback(BaseCallback):
+        def __init__(self, interval: int) -> None:
+            super().__init__()
+            self.interval = interval
+            self.next_log = model.num_timesteps + interval
+
+        def _on_step(self) -> bool:
+            if self.num_timesteps >= self.next_log:
+                print(
+                    f"[train progress] {self.num_timesteps:,} total timesteps",
+                    flush=True,
+                )
+                while self.next_log <= self.num_timesteps:
+                    self.next_log += self.interval
+            return True
+
     rounds: list[dict[str, Any]] = (
         list(previous_report.get("rounds", [])) if previous_report else []
     )
@@ -202,6 +231,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             total_timesteps=args.steps_per_round,
             reset_num_timesteps=False,
             progress_bar=False,
+            callback=TrainingProgressCallback(args.log_every_steps),
         )
         model.save(last_model)
         round_numpy = args.output_dir / "last_meta_policy.npz"
@@ -277,6 +307,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval-seed-offset", type=int, default=9_000_000)
     parser.add_argument("--model-seed", type=int, default=42)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--log-every-steps", type=int, default=2_000)
     return parser.parse_args()
 
 

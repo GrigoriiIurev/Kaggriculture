@@ -64,6 +64,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-win-rate", type=float, default=0.8)
     parser.add_argument("--eval-games", type=int, default=20)
     parser.add_argument("--train-envs", type=int, default=2)
+    parser.add_argument("--log-every-steps", type=int, default=2_000)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--submit", action="store_true")
     parser.add_argument("--submit-below-target", action="store_true")
@@ -78,6 +79,7 @@ def main() -> None:
     work = Path("/content/kaggriculture_rl_work")
     work.mkdir(parents=True, exist_ok=True)
     expert = work / "boatlee_v16.py"
+    print("[1/4] Preparing the Boatlee opponent", flush=True)
     fetch_opponent(args.kernel, expert)
 
     results = args.drive_root / "rl_boatlee_v16"
@@ -101,11 +103,15 @@ def main() -> None:
         str(args.eval_games),
         "--train-envs",
         str(args.train_envs),
+        "--log-every-steps",
+        str(args.log_every_steps),
         "--device",
         args.device,
     ]
+    print("[2/4] Training and held-out evaluation", flush=True)
     run(train_command)
 
+    print("[3/4] Building and testing the Kaggle archive", flush=True)
     report_path = results / "training_report.json"
     report = json.loads(report_path.read_text(encoding="utf-8"))
     local_submission = work / "submission.tar.gz"
@@ -120,6 +126,7 @@ def main() -> None:
     shutil.copy2(expert, results / "boatlee_v16_source.py")
 
     allowed = report["target_met"] or args.submit_below_target
+    print("[4/4] Applying the submission quality gate", flush=True)
     if args.submit and allowed:
         submit_once(
             drive_submission,
