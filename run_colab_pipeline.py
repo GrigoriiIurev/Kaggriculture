@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -19,6 +20,7 @@ REQUIRED_DATASET_FILES = (
     "worker_dataset.jsonl.gz",
     "worker_manifest.json",
 )
+SUBMISSION_FORMAT_VERSION = 2
 
 
 def run(command: list[str], cwd: Path | None = None) -> None:
@@ -100,7 +102,12 @@ def save_checkpoint(
     print(f"[checkpoint] Saved {archive}", flush=True)
 
 
-def verify_submission(submission: Path) -> None:
+def verify_submission(submission: Path, smoke_test: bool = True) -> None:
+    with submission.open("rb") as source:
+        if source.read(2) != b"\x1f\x8b":
+            raise RuntimeError(
+                f"{submission} is not gzip-compressed despite its .tar.gz suffix"
+            )
     required = {
         "main.py",
         "artifacts/models/promoted_worker_bc.npz",
@@ -111,25 +118,28 @@ def verify_submission(submission: Path) -> None:
         missing = required - names
         if missing:
             raise RuntimeError(f"Submission is missing: {sorted(missing)}")
-        with tempfile.TemporaryDirectory() as directory:
-            archive.extractall(directory, filter="data")
-            smoke_code = (
-                "from kaggle_environments import make; "
-                "env=make('kaggriculture', configuration={'episodeSteps': 24}, "
-                "debug=True); "
-                "env.run(['main.py', 'random']); "
-                "final=env.steps[-1]; "
-                "assert all(str(s.status) == 'DONE' for s in final), final; "
-                "print([(str(s.status), s.reward) for s in final])"
-            )
-            run([sys.executable, "-c", smoke_code], cwd=Path(directory))
-    print("[submission] Archive and isolated smoke test passed", flush=True)
+        if smoke_test:
+            with tempfile.TemporaryDirectory() as directory:
+                archive.extractall(directory, filter="data")
+                smoke_code = (
+                    "from kaggle_environments import make; "
+                    "env=make('kaggriculture', "
+                    "configuration={'episodeSteps': 24}, debug=True); "
+                    "env.run(['main.py', 'random']); "
+                    "final=env.steps[-1]; "
+                    "assert all(str(s.status) == 'DONE' for s in final), final; "
+                    "print([(str(s.status), s.reward) for s in final])"
+                )
+                run([sys.executable, "-c", smoke_code], cwd=Path(directory))
+    detail = " and isolated smoke test" if smoke_test else ""
+    print(f"[submission] Archive{detail} passed", flush=True)
 
 
 def submission_fingerprint(path: Path) -> str:
     """Hash archive payloads without timestamps or other tar metadata."""
 
     digest = hashlib.sha256()
+    digest.update(f"submission-format-{SUBMISSION_FORMAT_VERSION}\0".encode())
     with tarfile.open(path, "r:gz") as archive:
         for member in sorted(archive.getmembers(), key=lambda item: item.name):
             if not member.isfile():
@@ -142,6 +152,27 @@ def submission_fingerprint(path: Path) -> str:
             for chunk in iter(lambda: source.read(1024 * 1024), b""):
                 digest.update(chunk)
     return digest.hexdigest()
+
+
+def binary_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def copy_submission_to_drive(source: Path, destination: Path) -> None:
+    partial = destination.with_name(f".{destination.name}.partial")
+    try:
+        shutil.copyfile(source, partial)
+        if binary_sha256(source) != binary_sha256(partial):
+            raise RuntimeError("Submission changed while copying it to Drive")
+        partial.replace(destination)
+    finally:
+        partial.unlink(missing_ok=True)
+    verify_submission(destination, smoke_test=False)
+    print(f"[submission] Verified Drive copy: {destination}", flush=True)
 
 
 def submit_once(
@@ -311,7 +342,8 @@ def main() -> None:
     else:
         print(f"[train] Reusing trained model {model}", flush=True)
 
-    submission = result_directory / "submission.tar.gz"
+    local_submission = work_directory / "submission.tar.gz"
+    drive_submission = result_directory / "submission.tar.gz"
     run(
         [
             sys.executable,
@@ -319,15 +351,16 @@ def main() -> None:
             "--worker-model",
             str(model),
             "--output",
-            str(submission),
+            str(local_submission),
         ]
     )
-    verify_submission(submission)
+    verify_submission(local_submission)
+    copy_submission_to_drive(local_submission, drive_submission)
 
     receipt = result_directory / "submission_receipt.json"
     if args.submit:
         submit_once(
-            submission,
+            local_submission,
             receipt,
             args.competition,
             args.message,
@@ -341,7 +374,7 @@ def main() -> None:
                 "model": str(model),
                 "report": str(report),
                 "policy_report": str(policy_report),
-                "submission": str(submission),
+                "submission": str(drive_submission),
                 "submitted": args.submit,
                 "receipt": str(receipt) if receipt.is_file() else None,
             },

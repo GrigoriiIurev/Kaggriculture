@@ -17,3 +17,5 @@ data/teacher_processed/
 # Generated reports and submission archives.
 artifacts/reports/
 artifacts/*.tar.gz
+/submission*.tar
+/submission*.tar.gz

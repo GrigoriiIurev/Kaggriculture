@@ -4,6 +4,7 @@ from pathlib import Path
 
 from package_submission import build_submission
 from run_colab_pipeline import (
+    copy_submission_to_drive,
     restore_checkpoint,
     save_checkpoint,
     submission_fingerprint,
@@ -26,6 +27,21 @@ class ColabPipelineTests(unittest.TestCase):
                 submission_fingerprint(first),
                 submission_fingerprint(second),
             )
+
+    def test_drive_copy_remains_a_gzip_archive(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            model = root / "worker.npz"
+            model.write_bytes(b"model")
+            local = root / "local.tar.gz"
+            drive = root / "drive" / "submission.tar.gz"
+            drive.parent.mkdir()
+            build_submission(local, model)
+
+            copy_submission_to_drive(local, drive)
+
+            self.assertEqual(drive.read_bytes()[:2], b"\x1f\x8b")
+            self.assertEqual(local.read_bytes(), drive.read_bytes())
 
     def test_checkpoint_round_trip_preserves_directory_layout(self):
         with tempfile.TemporaryDirectory() as directory:

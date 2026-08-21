@@ -47,7 +47,9 @@ def build_submission(
     if worker_model is not None:
         included.extend(WORKER_MODEL_INCLUDED)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(output_path, "w:gz") as archive:
+    with tarfile.open(
+        output_path, "w:gz", format=tarfile.GNU_FORMAT
+    ) as archive:
         for path in included:
             if path.exists():
                 archive.add(path, arcname=str(path), filter=_exclude_generated)

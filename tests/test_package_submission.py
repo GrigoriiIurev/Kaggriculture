@@ -14,10 +14,12 @@ class PackageSubmissionTests(unittest.TestCase):
             output = Path(directory) / "submission.tar.gz"
 
             result = build_submission(output, worker_model)
+            magic = output.read_bytes()[:2]
             with tarfile.open(output, "r:gz") as archive:
                 names = set(archive.getnames())
 
         self.assertEqual(result["agent"], "behavior_cloning_workers")
+        self.assertEqual(magic, b"\x1f\x8b")
         self.assertIn("main.py", names)
         self.assertIn(WORKER_MODEL_ARCHIVE_PATH, names)
         self.assertIn(
