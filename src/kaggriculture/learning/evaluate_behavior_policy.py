@@ -25,11 +25,22 @@ def evaluate_policy(
     policy = BehaviorCloningPolicy(model_path)
     encoder = ActionEncoder()
     groups = worker_samples = operation_hits = full_hits = excluded_targets = 0
+    transitions_seen = 0
+    next_progress = 10_000
     episodes: set[int] = set()
 
     with gzip.open(transitions_path, "rt", encoding="utf-8") as source:
         for line in source:
             transition = json.loads(line)
+            transitions_seen += 1
+            if transitions_seen >= next_progress:
+                print(
+                    "[policy evaluation] "
+                    f"{transitions_seen:,} transitions scanned, "
+                    f"{worker_samples:,} holdout worker samples checked",
+                    flush=True,
+                )
+                next_progress += 10_000
             episode_id = int(transition["episode_id"])
             if episode_split(episode_id) != "holdout":
                 continue
