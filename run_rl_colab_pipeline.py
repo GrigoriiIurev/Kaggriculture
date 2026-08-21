@@ -82,7 +82,7 @@ def main() -> None:
     print("[1/4] Preparing the Boatlee opponent", flush=True)
     fetch_opponent(args.kernel, expert)
 
-    results = args.drive_root / "rl_boatlee_v16"
+    results = args.drive_root / "rl_boatlee_market_v2"
     results.mkdir(parents=True, exist_ok=True)
     train_command = [
         sys.executable,

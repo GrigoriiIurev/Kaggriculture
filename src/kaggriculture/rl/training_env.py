@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 
-from ..agent import RuleBasedAgent
 from ..data.feature_extractor import FeatureExtractor
 from .meta_policy import call_agent, candidate_actions, load_agent_module
 
@@ -86,7 +85,6 @@ class KaggricultureMetaEnv(gym.Env):
         self._opponent = load_agent_module(
             self.expert_path, "kaggriculture_training_opponent_expert"
         ).agent
-        self._rule_agent = RuleBasedAgent()
         self._previous_margin = self._money_margin()
         return self._observation(), {
             "game_seed": game_seed,
@@ -108,7 +106,6 @@ class KaggricultureMetaEnv(gym.Env):
         candidates = candidate_actions(
             learner_obs,
             self._learner_expert,
-            self._rule_agent,
             self._environment.configuration,
         )
         opponent_action = call_agent(

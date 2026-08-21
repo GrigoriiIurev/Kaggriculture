@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-from .meta_policy import CANDIDATE_NAMES, NumpyMetaPolicy
+from .meta_policy import CANDIDATE_NAMES, POLICY_VERSION, NumpyMetaPolicy
 from .training_env import KaggricultureMetaEnv
 
 
@@ -34,6 +34,7 @@ def save_fallback_policy(
         b2=np.asarray([1.0, 0.0, 0.0, 0.0], dtype=np.float32),
         feature_count=np.asarray(feature_count),
         candidate_count=np.asarray(len(CANDIDATE_NAMES)),
+        policy_version=np.asarray(POLICY_VERSION),
     )
 
 
@@ -53,6 +54,7 @@ def export_sb3_policy(model: Any, path: str | Path) -> None:
     arrays: dict[str, Any] = {
         "feature_count": np.asarray(model.observation_space.shape[0]),
         "candidate_count": np.asarray(model.action_space.n),
+        "policy_version": np.asarray(POLICY_VERSION),
     }
     for index, layer in enumerate(layers):
         arrays[f"w{index}"] = layer.weight.detach().cpu().numpy().astype(np.float32)
@@ -193,12 +195,20 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             n_steps=args.rollout_steps,
             batch_size=args.batch_size,
             n_epochs=args.ppo_epochs,
-            gamma=0.999,
+            gamma=1.0,
             gae_lambda=0.95,
             ent_coef=args.entropy,
             verbose=1,
             device=args.device,
             seed=args.model_seed,
+        )
+        with torch.no_grad():
+            model.policy.action_net.bias.zero_()
+            model.policy.action_net.bias[0] = args.expert_initial_bias
+        print(
+            f"[train] Initialized with expert action bias "
+            f"{args.expert_initial_bias}",
+            flush=True,
         )
 
     class TrainingProgressCallback(BaseCallback):
@@ -273,6 +283,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     report = {
         "expert": str(args.expert),
         "candidate_names": list(CANDIDATE_NAMES),
+        "policy_version": POLICY_VERSION,
         "baseline": baseline,
         "best": best_metrics,
         "target_win_rate": args.target_win_rate,
@@ -303,6 +314,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ppo-epochs", type=int, default=5)
     parser.add_argument("--learning-rate", type=float, default=3e-4)
     parser.add_argument("--entropy", type=float, default=0.01)
+    parser.add_argument("--expert-initial-bias", type=float, default=2.0)
     parser.add_argument("--train-seed-offset", type=int, default=10_000)
     parser.add_argument("--eval-seed-offset", type=int, default=9_000_000)
     parser.add_argument("--model-seed", type=int, default=42)

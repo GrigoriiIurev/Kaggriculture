@@ -13,15 +13,16 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from ..agent import RuleBasedAgent
 from ..data.feature_extractor import FeatureExtractor
 
 
+POLICY_VERSION = 2
+PREMIUM_PRODUCTS = ("MILK", "WOOL", "STRAWBERRY", "MELON")
 CANDIDATE_NAMES = (
     "expert",
-    "rule_based",
-    "expert_workers_rule_market",
-    "rule_workers_expert_market",
+    "expert_plus_25pct_premium_sales",
+    "expert_plus_50pct_premium_sales",
+    "expert_plus_100pct_premium_sales",
 )
 
 
@@ -90,33 +91,72 @@ def normalize_action(action: Any, hand_count: int) -> dict[str, list[Any]]:
 def candidate_actions(
     observation: Any,
     expert: Callable[..., dict[str, Any]],
-    rule_agent: Callable[..., dict[str, Any]],
     configuration: Any | None = None,
 ) -> tuple[dict[str, list[Any]], ...]:
-    """Build the four actions available to the neural controller."""
+    """Keep the expert route intact and vary only extra premium sales."""
 
     player = int(observation["player"])
     hand_count = len(observation["farms"][player]["hands"])
     expert_action = normalize_action(
         call_agent(expert, observation, configuration), hand_count
     )
-    rule_action = normalize_action(
-        call_agent(rule_agent, observation, configuration), hand_count
+    return tuple(
+        copy.deepcopy(expert_action)
+        if fraction == 0.0
+        else _add_premium_sales(expert_action, observation, fraction)
+        for fraction in (0.0, 0.25, 0.5, 1.0)
     )
-    return (
-        copy.deepcopy(expert_action),
-        copy.deepcopy(rule_action),
-        {
-            "farmer": copy.deepcopy(expert_action["farmer"]),
-            "hands": copy.deepcopy(expert_action["hands"]),
-            "market": copy.deepcopy(rule_action["market"]),
-        },
-        {
-            "farmer": copy.deepcopy(rule_action["farmer"]),
-            "hands": copy.deepcopy(rule_action["hands"]),
-            "market": copy.deepcopy(expert_action["market"]),
-        },
-    )
+
+
+def _add_premium_sales(
+    expert_action: dict[str, list[Any]],
+    observation: Any,
+    fraction: float,
+) -> dict[str, list[Any]]:
+    """Add legal sales without removing or reordering any expert command."""
+
+    action = copy.deepcopy(expert_action)
+    market = action["market"]
+    shed = observation["private"]["shed"]
+    reserved = _pickup_reservations(action)
+    for product in PREMIUM_PRODUCTS:
+        stock = max(0, int(shed.get(product, 0)))
+        existing = next(
+            (
+                order
+                for order in market
+                if len(order) >= 3
+                and order[0] == "SELL"
+                and order[1] == product
+            ),
+            None,
+        )
+        already_selling = max(0, int(existing[2])) if existing else 0
+        available = max(
+            0,
+            stock - already_selling - reserved.get(product, 0),
+        )
+        if available <= 0:
+            continue
+        quantity = max(1, int(np.ceil(available * fraction)))
+        if existing is not None:
+            existing[2] = already_selling + quantity
+        elif len(market) < 10:
+            market.append(["SELL", product, quantity])
+    action["market"] = market[:10]
+    return action
+
+
+def _pickup_reservations(action: dict[str, list[Any]]) -> dict[str, int]:
+    reservations: dict[str, int] = {}
+    commands = [action["farmer"], *action["hands"]]
+    for command in commands:
+        if len(command) < 2 or command[0] != "PICKUP":
+            continue
+        item = str(command[1])
+        quantity = 1 if len(command) < 3 else max(0, int(command[2]))
+        reservations[item] = reservations.get(item, 0) + quantity
+    return reservations
 
 
 class NumpyMetaPolicy:
@@ -133,6 +173,12 @@ class NumpyMetaPolicy:
             )
             self.feature_count = int(payload["feature_count"])
             self.candidate_count = int(payload["candidate_count"])
+            self.policy_version = int(payload.get("policy_version", 0))
+        if self.policy_version != POLICY_VERSION:
+            raise ValueError(
+                f"Model policy version is {self.policy_version}; "
+                f"runtime requires {POLICY_VERSION}"
+            )
         if self.candidate_count != len(CANDIDATE_NAMES):
             raise ValueError(
                 f"Model has {self.candidate_count} candidates; "
@@ -162,7 +208,6 @@ class MetaControllerAgent:
         self.policy = NumpyMetaPolicy(model_path)
         self.extractor = FeatureExtractor()
         self.expert_module = load_agent_module(expert_path)
-        self.rule_agent = RuleBasedAgent()
 
     def __call__(
         self, observation: Any, configuration: Any | None = None
@@ -172,7 +217,6 @@ class MetaControllerAgent:
         actions = candidate_actions(
             observation,
             self.expert_module.agent,
-            self.rule_agent,
             configuration,
         )
         return actions[choice]
