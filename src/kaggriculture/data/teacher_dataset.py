@@ -58,7 +58,13 @@ def build_teacher_transitions(
     transition_count = 0
 
     with gzip.open(transitions_path, "wt", encoding="utf-8", newline="\n") as output:
-        for path in paths:
+        for number, path in enumerate(paths, start=1):
+            if number == 1 or number % 10 == 0 or number == len(paths):
+                print(
+                    f"[transitions] replay {number:,}/{len(paths):,}: "
+                    f"{path.name}; {transition_count:,} transitions written",
+                    flush=True,
+                )
             try:
                 replay = load_replay(path)
             except ReplayParseError as exc:

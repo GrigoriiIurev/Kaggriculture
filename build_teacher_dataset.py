@@ -18,6 +18,8 @@ OUTPUT_DIRECTORY = Path("data/teacher_processed")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--replays", type=Path, default=REPLAY_DIRECTORY)
+    parser.add_argument("--output", type=Path, default=OUTPUT_DIRECTORY)
     parser.add_argument("--winner-only", action="store_true")
     parser.add_argument("--minimum-reward", type=float, default=0.0)
     parser.add_argument("--minimum-steps", type=int, default=700)
@@ -38,8 +40,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    transition_path = OUTPUT_DIRECTORY / "transitions.jsonl.gz"
-    manifest_path = OUTPUT_DIRECTORY / "manifest.json"
+    replay_directory = args.replays
+    output_directory = args.output
+    transition_path = output_directory / "transitions.jsonl.gz"
+    manifest_path = output_directory / "manifest.json"
     total_stages = 2 if args.worker_only else 4
     if args.reuse_transitions:
         if not transition_path.is_file() or not manifest_path.is_file():
@@ -52,8 +56,8 @@ def main() -> None:
     else:
         print(f"[1/{total_stages} teacher transitions] started", flush=True)
         transitions = build_teacher_transitions(
-            REPLAY_DIRECTORY,
-            OUTPUT_DIRECTORY,
+            replay_directory,
+            output_directory,
             winner_only=args.winner_only,
             minimum_reward=args.minimum_reward,
             minimum_steps=args.minimum_steps,
@@ -70,8 +74,8 @@ def main() -> None:
     )
 
     if not args.worker_only:
-        feature_path = OUTPUT_DIRECTORY / "features.jsonl.gz"
-        feature_manifest_path = OUTPUT_DIRECTORY / "feature_manifest.json"
+        feature_path = output_directory / "features.jsonl.gz"
+        feature_manifest_path = output_directory / "feature_manifest.json"
         if args.reuse_features:
             if not feature_path.is_file() or not feature_manifest_path.is_file():
                 raise RuntimeError(
@@ -93,15 +97,15 @@ def main() -> None:
     print(f"[{worker_stage} teacher workers] started", flush=True)
     workers = build_worker_dataset(
         transition_path,
-        OUTPUT_DIRECTORY / "worker_dataset.jsonl.gz",
+        output_directory / "worker_dataset.jsonl.gz",
     )
     print(f"[{worker_stage} teacher workers] complete", flush=True)
 
     if not args.worker_only:
         print("[4/4 teacher economics] started", flush=True)
         economics = build_economic_dataset(
-            OUTPUT_DIRECTORY / "features.jsonl.gz",
-            OUTPUT_DIRECTORY / "economic_dataset.jsonl.gz",
+            output_directory / "features.jsonl.gz",
+            output_directory / "economic_dataset.jsonl.gz",
         )
         print("[4/4 teacher economics] complete", flush=True)
 
@@ -114,7 +118,7 @@ def main() -> None:
                 "worker_samples": workers["worker_samples"],
                 "economic_rows": economics["rows"] if not args.worker_only else None,
                 "features": features["feature_count"] if not args.worker_only else None,
-                "output": str(OUTPUT_DIRECTORY),
+                "output": str(output_directory),
             },
             ensure_ascii=False,
             indent=2,

@@ -52,6 +52,14 @@ python3 package_submission.py
 
 Готовый файл: `artifacts/submission.tar.gz`.
 
+Чтобы собрать гибридного агента с обученной Worker Policy:
+
+```bash
+python3 package_submission.py \
+  --worker-model /path/to/teacher_worker_bc.npz \
+  --output artifacts/submission.tar.gz
+```
+
 ## Структура
 
 - `main.py` — единственная обязательная точка входа Kaggle.

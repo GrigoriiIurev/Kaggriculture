@@ -15,13 +15,14 @@ replays, build datasets, train, evaluate, and package a submission.
 
 ## Train in Google Colab
 
-[Open the training notebook in Colab](https://colab.research.google.com/github/GrigoriiIurev/Kaggriculture/blob/main/kaggriculture_training_colab.ipynb).
+[Open the end-to-end notebook in Colab](https://colab.research.google.com/github/GrigoriiIurev/Kaggriculture/blob/main/kaggriculture_end_to_end_colab.ipynb).
 
 The notebook downloads public teacher replays directly from Kaggle, builds the
-teacher dataset, trains the streaming behavior-cloning model, and saves the
-model and evaluation reports to Google Drive. Add `KAGGLE_API_TOKEN` through
-Colab Secrets before running it. Replay JSON files and generated datasets are
-intentionally excluded from Git.
+worker dataset, trains and validates the streaming behavior-cloning model,
+packages the hybrid agent, runs an isolated smoke test, and can submit it to
+Kaggle. Checkpoints, models, reports, and the final archive are saved to Google
+Drive. Add `KAGGLE_API_TOKEN` through Colab Secrets before running it. Replay
+JSON files and generated datasets are intentionally excluded from Git.
 
 ## Overview
 
