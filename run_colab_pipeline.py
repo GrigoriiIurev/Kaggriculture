@@ -239,24 +239,16 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
-    best_only = not args.all_submissions
-    winner_only = not args.both_players
-    dataset_id = (
-        f"top{args.top_players}_replays{args.replays_per_player}_"
-        f"best{int(best_only)}_winner{int(winner_only)}"
-    )
-    run_id = f"{dataset_id}_epochs{args.epochs}_batch{args.batch_size}"
-    work_directory = args.work_root / dataset_id
-    replay_directory = work_directory / "teacher_replays"
-    dataset_directory = work_directory / "teacher_processed"
-    checkpoint_directory = args.drive_root / "checkpoints"
-    result_directory = args.drive_root / "results" / run_id
-    replay_checkpoint = checkpoint_directory / f"{dataset_id}_replays.tar.gz"
-    dataset_checkpoint = checkpoint_directory / f"{dataset_id}_processed.tar.gz"
-    result_directory.mkdir(parents=True, exist_ok=True)
-
+def prepare_teacher_dataset(
+    args: argparse.Namespace,
+    work_directory: Path,
+    replay_directory: Path,
+    dataset_directory: Path,
+    replay_checkpoint: Path,
+    dataset_checkpoint: Path,
+    best_only: bool,
+    winner_only: bool,
+) -> None:
     restored_replays = False
     if not args.no_checkpoints:
         restored_replays = restore_checkpoint(
@@ -284,7 +276,8 @@ def main() -> None:
         download_marker.write_text("{}\n", encoding="utf-8")
     else:
         print(
-            f"[download] Reusing {len(list(replay_directory.glob('*.json'))):,} replays",
+            f"[download] Reusing "
+            f"{len(list(replay_directory.glob('*.json'))):,} replays",
             flush=True,
         )
     if not args.no_checkpoints:
@@ -311,10 +304,39 @@ def main() -> None:
     if not args.no_checkpoints:
         save_checkpoint(dataset_directory, dataset_checkpoint)
 
+
+def main() -> None:
+    args = parse_args()
+    best_only = not args.all_submissions
+    winner_only = not args.both_players
+    dataset_id = (
+        f"top{args.top_players}_replays{args.replays_per_player}_"
+        f"best{int(best_only)}_winner{int(winner_only)}"
+    )
+    run_id = f"{dataset_id}_epochs{args.epochs}_batch{args.batch_size}"
+    work_directory = args.work_root / dataset_id
+    replay_directory = work_directory / "teacher_replays"
+    dataset_directory = work_directory / "teacher_processed"
+    checkpoint_directory = args.drive_root / "checkpoints"
+    result_directory = args.drive_root / "results" / run_id
+    replay_checkpoint = checkpoint_directory / f"{dataset_id}_replays.tar.gz"
+    dataset_checkpoint = checkpoint_directory / f"{dataset_id}_processed.tar.gz"
+    result_directory.mkdir(parents=True, exist_ok=True)
     model = result_directory / "teacher_worker_bc.npz"
     report = result_directory / "teacher_worker_bc_report.json"
     policy_report = result_directory / "teacher_worker_bc_policy_report.json"
-    if not all(path.is_file() for path in (model, report, policy_report)):
+    trained = all(path.is_file() for path in (model, report, policy_report))
+    if not trained:
+        prepare_teacher_dataset(
+            args,
+            work_directory,
+            replay_directory,
+            dataset_directory,
+            replay_checkpoint,
+            dataset_checkpoint,
+            best_only,
+            winner_only,
+        )
         run(
             [
                 sys.executable,
@@ -340,7 +362,10 @@ def main() -> None:
             ]
         )
     else:
-        print(f"[train] Reusing trained model {model}", flush=True)
+        print(
+            f"[train] Reusing {model}; replay and dataset restore skipped",
+            flush=True,
+        )
 
     local_submission = work_directory / "submission.tar.gz"
     drive_submission = result_directory / "submission.tar.gz"
