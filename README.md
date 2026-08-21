@@ -1,5 +1,21 @@
 # Kaggriculture
 
+## Colab: reinforcement learning against Boatlee V16
+
+Open [`kaggriculture_rl_boatlee_colab.ipynb`](kaggriculture_rl_boatlee_colab.ipynb)
+in Google Colab and choose **Runtime -> Run all**. The notebook requests Google
+Drive access before training, downloads the public
+[Boatlee V16-RC5 agent](https://www.kaggle.com/code/boatlee/v16-rc5-high-score-8c-4s-premium-market-lead),
+trains a PPO neural controller against it, evaluates both player seats on held-out
+seeds, and creates `submission.tar.gz` on Drive.
+
+The controller selects among the original expert, this repository's rule-based
+agent, and two worker/market hybrids. A verified expert-only fallback is retained
+until a trained checkpoint performs better. Automatic Kaggle submission is
+blocked unless `TARGET_WIN_RATE` is reached, unless `SUBMIT_BELOW_TARGET` is
+explicitly enabled in the notebook. Training resumes from Drive after a Colab
+restart.
+
 A farming sim where two players compete to maximize their income from farming by selling to a dynamic market.
 
 ## Project workflow
