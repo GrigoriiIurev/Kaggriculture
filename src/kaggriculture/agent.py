@@ -15,6 +15,7 @@ from .planning.worker_planner import WorkerPlanner
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROMOTED_CONFIG_PATH = PROJECT_ROOT / "artifacts/models/promoted_economic_config.json"
+PROMOTED_WORKER_MODEL_PATH = PROJECT_ROOT / "artifacts/models/promoted_worker_bc.npz"
 
 
 def load_economic_config(path: str | Path | None = None) -> EconomicConfig:
@@ -60,5 +61,47 @@ class RuleBasedAgent:
         return action
 
 
-def build_production_agent() -> RuleBasedAgent:
+class BehaviorCloningAgent:
+    """Learned worker policy combined with the proven economic planner."""
+
+    def __init__(
+        self,
+        model_path: str | Path,
+        config: EconomicConfig | None = None,
+    ) -> None:
+        from .learning.behavior_model import (
+            BehaviorCloningPolicy,
+            commands_to_action,
+        )
+
+        self.policy = BehaviorCloningPolicy(model_path)
+        self.commands_to_action = commands_to_action
+        self.task_generator = TaskGenerator()
+        self.economic_planner = EconomicPlanner(config or EconomicConfig())
+
+    def __call__(
+        self,
+        observation: Any,
+        configuration: Any | None = None,
+    ) -> dict[str, Any]:
+        state = parse_observation(observation)
+        farm_tasks = self.task_generator.generate(state)
+        economy = self.economic_planner.plan(state, farm_tasks)
+        commands = self.policy.predict_commands(observation)
+        market = [list(order) for order in economy.market_orders]
+        return self.commands_to_action(commands, market)
+
+
+def build_production_agent(
+    worker_model_path: str | Path | None = None,
+) -> RuleBasedAgent | BehaviorCloningAgent:
+    if worker_model_path is not None:
+        model_path = Path(worker_model_path)
+        if not model_path.is_file():
+            raise FileNotFoundError(f"Worker model not found: {model_path}")
+        return BehaviorCloningAgent(model_path, load_economic_config())
+    if PROMOTED_WORKER_MODEL_PATH.is_file():
+        return BehaviorCloningAgent(
+            PROMOTED_WORKER_MODEL_PATH, load_economic_config()
+        )
     return RuleBasedAgent(load_economic_config())
