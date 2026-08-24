@@ -10,6 +10,15 @@ generated `report.md` summarizes record, seat effects, opponent strategy
 profiles, deficit timing, and the worst losses. See
 [`docs/REPLAY_WAREHOUSE.md`](docs/REPLAY_WAREHOUSE.md) for file details.
 
+## Colab: Opponent League
+
+Open [`kaggriculture_opponent_league_colab.ipynb`](kaggriculture_opponent_league_colab.ipynb)
+in Google Colab to build the Stage 2 benchmark. It extracts the final agents
+from six selected public notebooks, plays the current submission against each
+one in both seats, checkpoints every game to Drive, and writes Bradley-Terry
+ratings plus a three-agent veto set. No Kaggle submission is made by this
+notebook. See [`docs/OPPONENT_LEAGUE.md`](docs/OPPONENT_LEAGUE.md).
+
 ## Colab: reinforcement learning against Boatlee V16
 
 Open [`kaggriculture_rl_boatlee_colab.ipynb`](kaggriculture_rl_boatlee_colab.ipynb)
