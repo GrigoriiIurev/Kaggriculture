@@ -401,6 +401,16 @@ env.run([my_agent, "random"])
 env.render(mode="ipython", width=800, height=800)
 ```
 
+## Training Workflows
+
+- [Replay warehouse](docs/REPLAY_WAREHOUSE.md): download and analyze the agent's
+  real Kaggle matches.
+- [Opponent league](docs/OPPONENT_LEAGUE.md): compare the incumbent with public
+  agents and create weighted training/veto sets.
+- [Stage 3 league training](docs/STAGE3_LEAGUE_TRAINING.md): train a guarded,
+  market-only residual against the entire league and package it only after a
+  paired promotion test.
+
 ## Configuration Defaults
 
 Per-crop seed costs and per-product base prices are not configurable; they are documented in the Object Types and Price Function tables above. The configurable knobs are:
