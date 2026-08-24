@@ -50,6 +50,7 @@ The important outputs are:
 - `results/pair_results.csv`: pairwise records;
 - `results/rankings.csv`: Bradley-Terry table;
 - `results/report.md`: readable summary.
+- `league_pipeline.log`: complete live log, including a traceback if a run fails.
 
 Rerunning the same configuration reuses completed games. A changed agent file
 has a changed SHA-256 key and is evaluated again automatically.
