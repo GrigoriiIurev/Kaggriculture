@@ -61,7 +61,32 @@ def load_agent_file(path: str | Path) -> Callable[..., dict[str, Any]]:
         raise ImportError(f"Cannot load {path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[name] = module
-    spec.loader.exec_module(module)
+    package_root = path.parent if (path.parent / "src").is_dir() else None
+    saved_src_modules: dict[str, Any] = {}
+    if package_root is not None:
+        # A packaged submission may contain its own ``src`` tree and model files.
+        # Temporarily hide the evaluator's identically named package so main.py
+        # resolves imports and artifact paths inside its extracted archive.
+        saved_src_modules = {
+            key: value
+            for key, value in list(sys.modules.items())
+            if key == "src" or key.startswith("src.")
+        }
+        for key in saved_src_modules:
+            sys.modules.pop(key, None)
+        sys.path.insert(0, str(package_root))
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if package_root is not None:
+            for key in list(sys.modules):
+                if key == "src" or key.startswith("src."):
+                    sys.modules.pop(key, None)
+            sys.modules.update(saved_src_modules)
+            try:
+                sys.path.remove(str(package_root))
+            except ValueError:
+                pass
     agent = getattr(module, "agent", None)
     if not callable(agent):
         raise AttributeError(f"{path} does not define callable agent")

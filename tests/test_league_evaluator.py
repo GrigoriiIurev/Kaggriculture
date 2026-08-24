@@ -1,4 +1,5 @@
 import json
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from src.kaggriculture.league.evaluator import (
     AgentSpec,
     bradley_terry,
     evaluate_league,
+    load_agent_file,
     materialize_main,
 )
 
@@ -41,6 +43,27 @@ class LeagueEvaluatorTests(unittest.TestCase):
                 bundle.add(source, arcname="main.py")
             result = materialize_main(archive, root / "unpacked")
             self.assertEqual(result.read_text(encoding="utf-8"), AGENT)
+
+    def test_multifile_agent_uses_its_own_src_package(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / "src/__init__.py").write_text("", encoding="utf-8")
+            (root / "src/bundled_value.py").write_text(
+                "VALUE = 'from_submission'\n", encoding="utf-8"
+            )
+            (root / "main.py").write_text(
+                "from src.bundled_value import VALUE\n"
+                "def agent(obs):\n"
+                "    return {'value': VALUE}\n",
+                encoding="utf-8",
+            )
+
+            original_src = sys.modules.get("src")
+            agent = load_agent_file(root / "main.py")
+
+            self.assertEqual(agent({}), {"value": "from_submission"})
+            self.assertIs(sys.modules.get("src"), original_src)
 
     def test_league_reuses_completed_games(self):
         with tempfile.TemporaryDirectory() as directory:
