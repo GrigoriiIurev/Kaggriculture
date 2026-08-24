@@ -1,5 +1,15 @@
 # Kaggriculture
 
+## Colab: Replay Warehouse
+
+Open [`kaggriculture_replay_warehouse_colab.ipynb`](kaggriculture_replay_warehouse_colab.ipynb)
+in Google Colab and choose **Runtime -> Run all**. It incrementally downloads the
+completed games of a submission to Drive, then builds episode diagnostics,
+two-player daily macro records, and two-player market-decision records. The
+generated `report.md` summarizes record, seat effects, opponent strategy
+profiles, deficit timing, and the worst losses. See
+[`docs/REPLAY_WAREHOUSE.md`](docs/REPLAY_WAREHOUSE.md) for file details.
+
 ## Colab: reinforcement learning against Boatlee V16
 
 Open [`kaggriculture_rl_boatlee_colab.ipynb`](kaggriculture_rl_boatlee_colab.ipynb)
