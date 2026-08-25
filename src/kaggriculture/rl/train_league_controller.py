@@ -100,7 +100,7 @@ def evaluate_policy(
     total_choice_counts = [
         [0 for _ in ACTION_NAMES] for _ in RESIDUAL_PRODUCTS
     ]
-    total_decisions = total_effective = 0
+    total_decisions = total_effective = total_safety_forced = 0
     for opponent_index, opponent in enumerate(opponents):
         wins = ties = losses = errors = 0
         margins: list[float] = []
@@ -125,6 +125,7 @@ def evaluate_policy(
                         if "choices" in info:
                             total_decisions += 1
                             total_effective += bool(info["residual_effective"])
+                            total_safety_forced += bool(info.get("safety_forced", False))
                             for product_index, selected in enumerate(info["choices"]):
                                 total_choice_counts[product_index][int(selected)] += 1
                         game_turn = int(info.get("game_turn", episode_steps))
@@ -187,6 +188,7 @@ def evaluate_policy(
         "effective_rate": (
             total_effective / total_decisions if total_decisions else 0.0
         ),
+        "safety_forced_decisions": total_safety_forced,
         "choice_counts": {
             product: dict(zip(ACTION_NAMES, counts))
             for product, counts in zip(RESIDUAL_PRODUCTS, total_choice_counts)
@@ -350,14 +352,15 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             seed=args.model_seed,
         )
         with torch.no_grad():
+            model.policy.action_net.weight.zero_()
             model.policy.action_net.bias.zero_()
             offset = 0
             for size in ACTION_DIMS:
                 model.policy.action_net.bias[offset] = args.incumbent_initial_bias
                 offset += size
         print(
-            "[train] Initialized an exploratory policy; the promotion gate "
-            "still protects the incumbent",
+            "[train] Initialized exact deterministic incumbent behavior; "
+            "stochastic rollouts explore conservative sale quantities",
             flush=True,
         )
         model.save(anchor_model)
@@ -374,6 +377,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             self.next_checkpoint = model.num_timesteps + checkpoint_interval
             self.decisions = 0
             self.effective = 0
+            self.safety_forced = 0
             self.choice_counts = [
                 [0 for _ in ACTION_NAMES] for _ in RESIDUAL_PRODUCTS
             ]
@@ -384,6 +388,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                     continue
                 self.decisions += 1
                 self.effective += bool(info.get("residual_effective", False))
+                self.safety_forced += bool(info.get("safety_forced", False))
                 for product_index, choice in enumerate(info["choices"]):
                     self.choice_counts[product_index][int(choice)] += 1
             if self.num_timesteps >= self.next_log:
@@ -392,6 +397,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
                     "[train actions] "
                     f"decisions={self.decisions:,}, effective={self.effective:,} "
                     f"({self.effective / max(1, self.decisions):.1%}), "
+                    f"safety_forced={self.safety_forced:,}, "
                     f"counts={dict(zip(RESIDUAL_PRODUCTS, self.choice_counts))}",
                     flush=True,
                 )
@@ -500,16 +506,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--incumbent", type=Path, required=True)
     parser.add_argument("--opponent-pool", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--steps-per-round", type=int, default=25_000)
-    parser.add_argument("--max-rounds", type=int, default=4)
+    parser.add_argument("--steps-per-round", type=int, default=10_000)
+    parser.add_argument("--max-rounds", type=int, default=6)
     parser.add_argument("--train-envs", type=int, default=2)
     parser.add_argument("--episode-steps", type=int, default=720)
     parser.add_argument("--rollout-steps", type=int, default=2048)
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--ppo-epochs", type=int, default=5)
-    parser.add_argument("--learning-rate", type=float, default=2e-4)
-    parser.add_argument("--entropy", type=float, default=0.005)
-    parser.add_argument("--incumbent-initial-bias", type=float, default=0.2)
+    parser.add_argument("--learning-rate", type=float, default=1e-4)
+    parser.add_argument("--entropy", type=float, default=0.002)
+    parser.add_argument("--incumbent-initial-bias", type=float, default=1.0)
     parser.add_argument("--weakness-bonus", type=float, default=2.0)
     parser.add_argument("--veto-weight-bonus", type=float, default=1.15)
     parser.add_argument("--catastrophic-score-drop", type=float, default=0.25)
@@ -519,7 +525,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model-seed", type=int, default=73)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--log-every-steps", type=int, default=2_000)
-    parser.add_argument("--checkpoint-every-steps", type=int, default=10_000)
+    parser.add_argument("--checkpoint-every-steps", type=int, default=5_000)
     return parser.parse_args()
 
 

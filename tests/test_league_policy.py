@@ -80,8 +80,8 @@ class LeaguePolicyTests(unittest.TestCase):
         self.assertEqual(result["market"][1], ["SELL", "MILK", 7])
         self.assertEqual(base["market"][1], ["SELL", "MILK", 2])
 
-        held = apply_market_residual(base, obs, [1, 0, 0, 0])
-        self.assertNotIn(["SELL", "MILK", 2], held["market"])
+        quarter = apply_market_residual(base, obs, [1, 0, 0, 0])
+        self.assertIn(["SELL", "MILK", 2], quarter["market"])
 
     def test_gate_rejects_veto_collapse(self):
         baseline = {
@@ -102,11 +102,17 @@ class LeaguePolicyTests(unittest.TestCase):
 
         self.assertFalse(promotion_gate(baseline, candidate)["passed"])
 
-    def test_endgame_turns_hold_into_liquidation_but_keeps_fallback(self):
+    def test_endgame_turns_residuals_into_liquidation_but_keeps_fallback(self):
         obs = observation(27 * 24)
 
         self.assertEqual(enforce_endgame_liquidation(obs, [1, 2, 3, 4]), (4, 4, 4, 4))
         self.assertEqual(enforce_endgame_liquidation(obs, [0, 0, 0, 0]), (0, 0, 0, 0))
+
+    def test_nearly_full_shed_forces_active_residuals_to_sell_all(self):
+        obs = observation()
+        obs["private"]["shed"] = {"MILK": 50, "WOOL": 36}
+
+        self.assertEqual(enforce_endgame_liquidation(obs, [1, 2, 0, 3]), (4, 4, 0, 4))
 
 
 if __name__ == "__main__":

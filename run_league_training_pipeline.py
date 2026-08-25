@@ -50,8 +50,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--drive-root", type=Path, required=True)
     parser.add_argument("--incumbent", type=Path, required=True)
-    parser.add_argument("--steps-per-round", type=int, default=25_000)
-    parser.add_argument("--max-rounds", type=int, default=4)
+    parser.add_argument("--steps-per-round", type=int, default=10_000)
+    parser.add_argument("--max-rounds", type=int, default=6)
     parser.add_argument("--train-envs", type=int, default=2)
     parser.add_argument("--eval-seed-count", type=int, default=2)
     parser.add_argument("--episode-steps", type=int, default=720)
@@ -72,8 +72,8 @@ def main() -> None:
     if not args.incumbent.is_file():
         raise FileNotFoundError(f"Missing incumbent archive: {args.incumbent}")
 
-    output_dir = args.drive_root / "results" / "stage3_league_market_v3"
-    work_dir = args.drive_root / "league" / "stage3_incumbent_v3"
+    output_dir = args.drive_root / "results" / "stage3_league_market_v4"
+    work_dir = args.drive_root / "league" / "stage3_incumbent_v4"
     output_dir.mkdir(parents=True, exist_ok=True)
     print("[1/5] Validating and extracting the immutable incumbent", flush=True)
     if work_dir.exists():

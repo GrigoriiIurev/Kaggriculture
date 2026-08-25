@@ -21,12 +21,19 @@ from ..core.game_data import (
 from .meta_policy import MetaControllerAgent, call_agent, normalize_action
 
 
-LEAGUE_POLICY_VERSION = 5
+LEAGUE_POLICY_VERSION = 6
 RESIDUAL_PRODUCTS = ("MILK", "WOOL", "STRAWBERRY", "MELON")
-ACTION_NAMES = ("KEEP_INCUMBENT", "HOLD", "SELL_25", "SELL_50", "SELL_100")
-TARGET_SALE_FRACTIONS = (None, 0.0, 0.25, 0.5, 1.0)
+ACTION_NAMES = (
+    "KEEP_INCUMBENT",
+    "SELL_25",
+    "SELL_50",
+    "SELL_75",
+    "SELL_100",
+)
+TARGET_SALE_FRACTIONS = (None, 0.25, 0.5, 0.75, 1.0)
 ACTION_DIMS = (5, 5, 5, 5)
 ENDGAME_LIQUIDATION_DAY = 27
+SHED_SAFETY_THRESHOLD = 85
 HISTORY_LAGS = (1, 4, 24)
 FARM_DELTA_LAGS = (1, 24)
 FARM_METRICS = (
@@ -346,18 +353,20 @@ def market_decision_available(
 def enforce_endgame_liquidation(
     observation: Mapping[str, Any], choices: Sequence[int]
 ) -> tuple[int, ...]:
-    """Turn every active residual into full liquidation near season end.
+    """Turn active residuals into full liquidation when stock becomes risky.
 
     Choice zero remains an exact incumbent fallback. A learned policy therefore
-    cannot hold stock forever, while the safe fallback remains byte-for-byte
-    equivalent in action semantics.
+    cannot strand stock near capacity or season end, while the safe fallback
+    remains byte-for-byte equivalent in action semantics.
     """
 
     normalized = tuple(int(choice) for choice in choices)
     if len(normalized) != len(RESIDUAL_PRODUCTS):
         raise ValueError("Wrong residual choice count")
     day = int(observation.get("day", 0) or 0)
-    if day < ENDGAME_LIQUIDATION_DAY:
+    shed = observation.get("private", {}).get("shed", {}) or {}
+    shed_occupancy = sum(max(0, int(value or 0)) for value in shed.values())
+    if day < ENDGAME_LIQUIDATION_DAY and shed_occupancy < SHED_SAFETY_THRESHOLD:
         return normalized
     sell_all = len(ACTION_NAMES) - 1
     return tuple(0 if choice == 0 else sell_all for choice in normalized)

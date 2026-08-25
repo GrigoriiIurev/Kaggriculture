@@ -42,8 +42,8 @@ class KaggricultureLeagueEnv(gym.Env):
         seed_offset: int = 0,
         fixed_opponent: int | None = None,
         fixed_seat: int | None = None,
-        win_bonus: float = 50.0,
-        market_reward_scale: float = 200.0,
+        win_bonus: float = 10.0,
+        market_reward_scale: float = 1_000.0,
     ) -> None:
         super().__init__()
         if not opponent_paths:
@@ -176,27 +176,26 @@ class KaggricultureLeagueEnv(gym.Env):
         observation, terminated, skipped = self._advance_to_decision()
         self._pending_terminal = terminated
         margin = self._money_margin()
-        money_reward = (margin - self._previous_margin) / 1000.0
+        money_reward = (margin - self._previous_margin) / 5000.0
         self._previous_margin = margin
-        inventory_pressure = self._inventory_pressure()
-        reward = money_reward + quality_reward + inventory_pressure
+        reward = money_reward + quality_reward
         info = self._info(None)
         info.update(
             {
                 "choices": choices.tolist(),
                 "raw_choices": raw_choices.tolist(),
+                "safety_forced": bool(np.any(choices != raw_choices)),
                 "residual_effective": effective,
                 "sale_quantity_changes": changes,
                 "market_quality_reward": quality_reward,
                 "money_reward": money_reward,
-                "inventory_pressure": inventory_pressure,
                 "auto_turns": skipped,
             }
         )
         if terminated:
             terminal = self._terminal_info()
             reward += self.win_bonus * int(terminal["outcome"])
-            reward -= min(25.0, float(terminal["terminal_premium_stock"]) / 5.0)
+            reward -= min(5.0, float(terminal["terminal_premium_stock"]) / 20.0)
             info.update(terminal)
         return observation, float(reward), terminated, False, info
 
@@ -239,22 +238,7 @@ class KaggricultureLeagueEnv(gym.Env):
                 1.0, float(BASE_PRICES[product])
             )
             raw += int(sales.get(product, 0)) * max(0.0, relative_price - 1.0)
-        return float(np.clip(raw / self.market_reward_scale, 0.0, 0.5))
-
-    def _inventory_pressure(self) -> float:
-        """Increasing holding cost that is zero through most of the season."""
-
-        observation = self._observation_for_seat(self._learner_seat)
-        day = int(observation.get("day", 0) or 0)
-        if day < 24:
-            return 0.0
-        shed = observation.get("private", {}).get("shed", {}) or {}
-        stock = sum(
-            max(0, int(shed.get(product, 0) or 0))
-            for product in RESIDUAL_PRODUCTS
-        )
-        urgency = min(1.0, (day - 23) / 6.0)
-        return float(-min(1.5, stock * urgency / 200.0))
+        return float(np.clip(raw / self.market_reward_scale, 0.0, 0.1))
 
     def _terminated(self) -> bool:
         assert self._states is not None

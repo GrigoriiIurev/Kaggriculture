@@ -26,6 +26,7 @@ class LeagueTrainingEnvTests(unittest.TestCase):
         self.assertGreater(reset_info["auto_turns"], 0)
         self.assertFalse(done)
         self.assertTrue(info["residual_effective"])
+        self.assertIn("safety_forced", info)
         self.assertTrue(any(info["sale_quantity_changes"].values()))
 
     def test_cheap_sale_is_not_punished_and_premium_sale_gets_small_bonus(self):
@@ -43,7 +44,7 @@ class LeagueTrainingEnvTests(unittest.TestCase):
 
         self.assertEqual(cheap, 0.0)
         self.assertGreater(premium, 0.0)
-        self.assertLessEqual(premium, 0.5)
+        self.assertLessEqual(premium, 0.1)
 
 
 if __name__ == "__main__":
