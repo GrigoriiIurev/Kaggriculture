@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from src.kaggriculture.analysis.replay_warehouse import build_replay_warehouse
+from src.kaggriculture.analysis.loss_replay_analyzer import build_loss_replay_analysis
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +27,11 @@ def main() -> None:
         team_name=args.team,
         episode_index_path=args.episode_index,
     )
+    result["loss_analysis"] = build_loss_replay_analysis(
+        args.output / result["files"]["daily_macro"],
+        args.output,
+        result["team_name"],
+    )["summary"]
     print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
 
 

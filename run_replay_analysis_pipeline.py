@@ -13,6 +13,9 @@ from scripts.sync_submission_replays import (
 )
 from scripts.update_replays import _find_kaggle, _run_kaggle
 from src.kaggriculture.analysis.replay_warehouse import build_replay_warehouse
+from src.kaggriculture.analysis.loss_replay_analyzer import (
+    build_loss_replay_analysis,
+)
 
 
 def resolve_submission(
@@ -51,7 +54,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    print("[1/3] Resolving the Kaggle submission", flush=True)
+    print("[1/4] Resolving the Kaggle submission", flush=True)
     submission = resolve_submission(
         args.competition, args.submission_id, args.kaggle
     )
@@ -61,7 +64,7 @@ def main() -> None:
     index = warehouse / "episode_index.json"
     analysis = warehouse / "analysis"
 
-    print("[2/3] Synchronizing completed replays", flush=True)
+    print("[2/4] Synchronizing completed replays", flush=True)
     sync_result = sync_submission_replays(
         replay_directory=replays,
         index_path=index,
@@ -84,7 +87,7 @@ def main() -> None:
         or previous_manifest.get("unique_episodes") != sync_result["local_selected"]
         or (args.team and previous_manifest.get("team_name") != args.team)
     )
-    print("[3/3] Building compact analytical datasets", flush=True)
+    print("[3/4] Building compact analytical datasets", flush=True)
     if needs_analysis:
         manifest = build_replay_warehouse(
             replay_directory=replays,
@@ -96,6 +99,13 @@ def main() -> None:
         manifest = previous_manifest
         print("[warehouse] No new replay; reusing the existing analysis", flush=True)
 
+    print("[4/4] Diagnosing losses and producing experiments", flush=True)
+    loss_report = build_loss_replay_analysis(
+        analysis / manifest["files"]["daily_macro"],
+        analysis,
+        str(manifest["team_name"]),
+    )
+
     receipt = {
         "submission": submission,
         "warehouse": str(warehouse),
@@ -103,7 +113,9 @@ def main() -> None:
         "analysis": str(analysis),
         "sync": sync_result,
         "summary": manifest["summary"],
+        "loss_summary": loss_report["summary"],
         "files": manifest["files"],
+        "loss_files": loss_report["files"],
     }
     latest = args.drive_root / "replay_warehouse" / "latest_analysis.json"
     latest.parent.mkdir(parents=True, exist_ok=True)

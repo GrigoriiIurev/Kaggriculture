@@ -93,6 +93,8 @@ def _field_counts(farm: Mapping[str, Any]) -> dict[str, Any]:
     animals: Counter[str] = Counter()
     plants: Counter[str] = Counter()
     weeds = structures = yield_units = 0
+    unwatered_plants = endangered_plants = 0
+    unfed_animals = endangered_animals = 0
     for row in farm.get("tiles", []):
         for tile in row:
             if not isinstance(tile, Mapping):
@@ -100,8 +102,12 @@ def _field_counts(farm: Mapping[str, Any]) -> dict[str, Any]:
             kind = str(tile.get("kind", ""))
             if kind == "PLANT" and tile.get("crop"):
                 plants[str(tile["crop"])] += 1
+                unwatered_plants += not bool(tile.get("watered_today", False))
+                endangered_plants += int(tile.get("consecutive_unwatered", 0) or 0) >= 1
             if tile.get("animal"):
                 animals[str(tile["animal"])] += 1
+                unfed_animals += not bool(tile.get("fed_today", False))
+                endangered_animals += int(tile.get("consecutive_unfed", 0) or 0) >= 1
             if kind == "WEED":
                 weeds += 1
             if kind in {"COOP", "PASTURE"}:
@@ -120,6 +126,10 @@ def _field_counts(farm: Mapping[str, Any]) -> dict[str, Any]:
         "weeds": weeds,
         "structures": structures,
         "yield_units": yield_units,
+        "unwatered_plants": unwatered_plants,
+        "endangered_plants": endangered_plants,
+        "unfed_animals": unfed_animals,
+        "endangered_animals": endangered_animals,
     }
 
 
@@ -285,6 +295,21 @@ def _write_jsonl(output: TextIO, record: Mapping[str, Any]) -> None:
     output.write("\n")
 
 
+def _scale_snapshot(state: Mapping[str, Any]) -> dict[str, dict[str, float]]:
+    fields = ("hands", "land", "animal_total", "plant_total", "premium_plant_total")
+    return {
+        side: {field: float(state[side].get(field, 0) or 0) for field in fields}
+        for side in ("me", "opponent")
+    }
+
+
+def _update_scale_peak(peak: dict[str, dict[str, float]], state: Mapping[str, Any]) -> None:
+    current = _scale_snapshot(state)
+    for side, values in current.items():
+        for field, value in values.items():
+            peak[side][field] = max(peak[side][field], value)
+
+
 def _flush_macro_day(
     output: TextIO,
     replay: Replay,
@@ -307,6 +332,7 @@ def _flush_macro_day(
         "final_margin": margin,
         "start": accumulator["start"],
         "end": accumulator["end"],
+        "peak": accumulator["peak"],
         "money_delta": accumulator["end"]["me"]["money"]
         - accumulator["start"]["me"]["money"],
         "field_actions": dict(accumulator["field_actions"]),
@@ -687,12 +713,14 @@ def build_replay_warehouse(
                                 "day": state["day"],
                                 "start": state,
                                 "end": next_state,
+                                "peak": _scale_snapshot(state),
                                 "field_actions": Counter(),
                                 "market_operations": Counter(),
                                 "market_units": Counter(),
                             }
                         )
                     accumulator["end"] = next_state
+                    _update_scale_peak(accumulator["peak"], next_state)
                     for command in action_summary["field"]:
                         if command:
                             accumulator["field_actions"][str(command[0])] += 1

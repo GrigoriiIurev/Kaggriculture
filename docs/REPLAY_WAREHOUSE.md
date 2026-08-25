@@ -27,6 +27,9 @@ MyDrive/Kaggriculture/replay_warehouse/submission_<ID>/
     ├── trajectory_profiles.csv
     ├── daily_macro.jsonl.gz
     ├── market_decisions.jsonl.gz
+    ├── loss_days.csv
+    ├── loss_diagnostics.json
+    ├── loss_report.md
     ├── manifest.json
     └── report.md
 ```
@@ -56,6 +59,23 @@ MyDrive/Kaggriculture/replay_warehouse/submission_<ID>/
 
 `report.md` — читаемый итог: W-T-L, влияние стороны, результаты против разных
 типов соперников, фаза возникновения дефицита и десять худших поражений.
+
+`loss_days.csv` показывает развитие каждого поражения по дням: денежный разрыв,
+разницу в животных, культурах, работниках и земле, заполнение склада, переносимые
+товары, риски ухода и долю `PASS`.
+
+`loss_diagnostics.json` содержит первый устойчивый дефицит, самый дорогой день,
+ранжированные возможные причины и подтверждающие показатели для каждого
+поражения. `loss_report.md` собирает главные причины и следующие проверяемые
+эксперименты в короткий читаемый отчёт.
+
+Повторно построить только диагноз по уже готовому Warehouse можно без скачивания
+реплеев:
+
+```bash
+python3 analyze_loss_replays.py \
+  --analysis data/replay_warehouse/analysis
+```
 
 ## Важно
 
