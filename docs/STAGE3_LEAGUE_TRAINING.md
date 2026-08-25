@@ -1,9 +1,9 @@
 # Stage 3: League Market Training
 
 Stage 3 keeps the submitted 1601-rated agent as an immutable incumbent. A small
-policy may only append sales of `MILK`, `WOOL`, `STRAWBERRY`, and `MELON`; it
+policy may only control sales of `MILK`, `WOOL`, `STRAWBERRY`, and `MELON`; it
 cannot change routes, workers, crops, animals, hires, land purchases, or the
-incumbent's existing market orders.
+incumbent's non-premium market orders.
 
 ## Inputs from earlier stages
 
@@ -18,15 +18,19 @@ incumbent's existing market orders.
 
 The observation includes current public state, the private inventory available
 to the agent, market price/inventory changes over 1, 4, and 24 turns, and public
-opponent-farm changes over 1 and 24 turns. PPO chooses one of four sale fractions
-for each premium product: 0%, 25%, 50%, or 100%.
+opponent-farm changes over 1 and 24 turns. PPO acts only when a sale can actually
+be changed. For each premium product it can keep the incumbent command, hold the
+product, or sell 25%, 50%, or 100%. The reward combines the final money result
+with the quality of prices at which stock was actually sold.
 
 Every evaluation uses the same seeds and both seats for the unchanged incumbent
 and the candidate. A candidate is promoted only if it has no runtime errors,
 improves the overall score/margin ordering, and does not materially regress on
-the Stage 2 veto opponents. Otherwise `submission.tar.gz` contains an exact
-zero-residual wrapper around the incumbent, so failed training cannot replace a
-known-working strategy.
+the Stage 2 veto opponents. The report also records every selected action and
+the fraction that actually changed a market command, so a no-op policy can no
+longer look like successful learning. Otherwise `submission.tar.gz` contains an
+exact zero-residual wrapper around the incumbent, so failed training cannot
+replace a known-working strategy.
 
 ## Colab
 
@@ -34,7 +38,7 @@ Open `kaggriculture_stage3_league_training_colab.ipynb`. Google Drive is mounted
 in the first cell, and the long-running cell streams every output line both to
 the notebook and to:
 
-`MyDrive/Kaggriculture/results/stage3_league_market/pipeline.log`
+`MyDrive/Kaggriculture/results/stage3_league_market_v2/pipeline.log`
 
 The final archive and reports are written to the same directory. Kaggle upload
 is disabled by default; set `SUBMIT_TO_KAGGLE = True` only after reviewing the

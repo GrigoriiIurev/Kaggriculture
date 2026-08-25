@@ -10,7 +10,14 @@ from typing import Any, Callable, Sequence
 
 import numpy as np
 
-from .league_policy import ACTION_DIMS, LEAGUE_POLICY_VERSION, MarketHistoryFeatures, NumpyLeaguePolicy
+from .league_policy import (
+    ACTION_DIMS,
+    ACTION_NAMES,
+    LEAGUE_POLICY_VERSION,
+    RESIDUAL_PRODUCTS,
+    MarketHistoryFeatures,
+    NumpyLeaguePolicy,
+)
 from .league_training_env import KaggricultureLeagueEnv
 
 
@@ -90,6 +97,10 @@ def evaluate_policy(
     """Evaluate every opponent on identical seeds and both seats."""
 
     rows: list[dict[str, Any]] = []
+    total_choice_counts = [
+        [0 for _ in ACTION_NAMES] for _ in RESIDUAL_PRODUCTS
+    ]
+    total_decisions = total_effective = 0
     for opponent_index, opponent in enumerate(opponents):
         wins = ties = losses = errors = 0
         margins: list[float] = []
@@ -107,17 +118,24 @@ def evaluate_policy(
                     observation, _ = environment.reset(seed=seed)
                     done = False
                     info: dict[str, Any] = {}
-                    turns = 0
+                    next_turn_log = 240
                     while not done:
                         choice = np.asarray(selector(observation), dtype=np.int64)
                         observation, _, done, _, info = environment.step(choice)
-                        turns += 1
-                        if turns % 240 == 0 and not done:
+                        if "choices" in info:
+                            total_decisions += 1
+                            total_effective += bool(info["residual_effective"])
+                            for product_index, selected in enumerate(info["choices"]):
+                                total_choice_counts[product_index][int(selected)] += 1
+                        game_turn = int(info.get("game_turn", episode_steps))
+                        if game_turn >= next_turn_log and not done:
                             print(
                                 f"[evaluate {opponent['slug']}] seed={seed} "
-                                f"seat={seat} turn={turns}/{episode_steps}",
+                                f"seat={seat} turn={game_turn}/{episode_steps}",
                                 flush=True,
                             )
+                            while next_turn_log <= game_turn:
+                                next_turn_log += 240
                     outcome = int(info["outcome"])
                     wins += outcome > 0
                     ties += outcome == 0
@@ -164,6 +182,15 @@ def evaluate_policy(
         "mean_money_margin": float(
             np.mean([row["mean_money_margin"] for row in rows])
         ),
+        "market_decisions": total_decisions,
+        "effective_decisions": total_effective,
+        "effective_rate": (
+            total_effective / total_decisions if total_decisions else 0.0
+        ),
+        "choice_counts": {
+            product: dict(zip(ACTION_NAMES, counts))
+            for product, counts in zip(RESIDUAL_PRODUCTS, total_choice_counts)
+        },
         "opponents": rows,
     }
 
@@ -198,6 +225,7 @@ def promotion_gate(
     improved = ranking > baseline_ranking
     passed = (
         candidate["errors"] == 0
+        and candidate.get("effective_decisions", 0) > 0
         and improved
         and all(check["passed"] for check in veto_checks)
     )
@@ -205,6 +233,7 @@ def promotion_gate(
         "passed": passed,
         "improved_over_incumbent": improved,
         "error_free": candidate["errors"] == 0,
+        "changed_market": candidate.get("effective_decisions", 0) > 0,
         "score_rate_change": candidate["score_rate"] - baseline["score_rate"],
         "mean_margin_change": candidate["mean_money_margin"]
         - baseline["mean_money_margin"],
@@ -217,6 +246,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("Training rounds and timesteps must be positive")
     if args.log_every_steps <= 0 or args.checkpoint_every_steps <= 0:
         raise ValueError("Log and checkpoint intervals must be positive")
+    if args.train_envs <= 0 or args.eval_seed_count <= 0:
+        raise ValueError("Environment and evaluation counts must be positive")
+    if args.weakness_bonus < 0 or args.veto_weight_bonus <= 0:
+        raise ValueError("Curriculum weight multipliers must be non-negative")
     print("[setup] Loading league and RL libraries", flush=True)
     try:
         import torch
@@ -230,7 +263,6 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     for row in opponents:
         row["veto"] = row["slug"] in veto_names or bool(row.get("veto", False))
     paths = [row["path"] for row in opponents]
-    weights = [float(row.get("sampling_weight", 1.0)) for row in opponents]
     args.output_dir.mkdir(parents=True, exist_ok=True)
     fallback = args.output_dir / "incumbent_fallback_policy.npz"
     best_numpy = args.output_dir / "best_league_policy.npz"
@@ -258,6 +290,27 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         episode_steps=args.episode_steps,
     )
     print(f"[baseline result] {json.dumps(baseline)}", flush=True)
+
+    baseline_by_name = {row["slug"]: row for row in baseline["opponents"]}
+    raw_weights = []
+    curriculum = {}
+    for row in opponents:
+        score_rate = baseline_by_name[row["slug"]]["score_rate"]
+        multiplier = 1.0 + args.weakness_bonus * (1.0 - score_rate)
+        if row["veto"]:
+            multiplier *= args.veto_weight_bonus
+        weight = float(row.get("sampling_weight", 1.0)) * multiplier
+        raw_weights.append(weight)
+        curriculum[row["slug"]] = {
+            "baseline_score_rate": score_rate,
+            "multiplier": multiplier,
+            "raw_weight": weight,
+        }
+    weight_total = sum(raw_weights)
+    weights = [weight / weight_total for weight in raw_weights]
+    for row, weight in zip(opponents, weights):
+        curriculum[row["slug"]]["sampling_weight"] = weight
+    print(f"[curriculum] {json.dumps(curriculum)}", flush=True)
 
     factories = []
     for index in range(args.train_envs):
@@ -299,7 +352,11 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             for size in ACTION_DIMS:
                 model.policy.action_net.bias[offset] = args.incumbent_initial_bias
                 offset += size
-        print("[train] Initialized as the unchanged incumbent", flush=True)
+        print(
+            "[train] Initialized an exploratory policy; the promotion gate "
+            "still protects the incumbent",
+            flush=True,
+        )
 
     class ProgressCallback(BaseCallback):
         def __init__(self, interval: int, checkpoint_interval: int) -> None:
@@ -308,10 +365,29 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             self.next_log = model.num_timesteps + interval
             self.checkpoint_interval = checkpoint_interval
             self.next_checkpoint = model.num_timesteps + checkpoint_interval
+            self.decisions = 0
+            self.effective = 0
+            self.choice_counts = [
+                [0 for _ in ACTION_NAMES] for _ in RESIDUAL_PRODUCTS
+            ]
 
         def _on_step(self) -> bool:
+            for info in self.locals.get("infos", []):
+                if "choices" not in info:
+                    continue
+                self.decisions += 1
+                self.effective += bool(info.get("residual_effective", False))
+                for product_index, choice in enumerate(info["choices"]):
+                    self.choice_counts[product_index][int(choice)] += 1
             if self.num_timesteps >= self.next_log:
                 print(f"[train progress] {self.num_timesteps:,} timesteps", flush=True)
+                print(
+                    "[train actions] "
+                    f"decisions={self.decisions:,}, effective={self.effective:,} "
+                    f"({self.effective / max(1, self.decisions):.1%}), "
+                    f"counts={dict(zip(RESIDUAL_PRODUCTS, self.choice_counts))}",
+                    flush=True,
+                )
                 while self.next_log <= self.num_timesteps:
                     self.next_log += self.interval
             if self.num_timesteps >= self.next_checkpoint:
@@ -384,6 +460,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "incumbent": str(args.incumbent),
             "opponent_pool": str(args.opponent_pool),
             "baseline": baseline,
+            "curriculum": curriculum,
             "best_candidate": best_candidate,
             "promoted": best_candidate is not None,
             "best_policy": str(best_numpy),
@@ -411,7 +488,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ppo-epochs", type=int, default=5)
     parser.add_argument("--learning-rate", type=float, default=2e-4)
     parser.add_argument("--entropy", type=float, default=0.01)
-    parser.add_argument("--incumbent-initial-bias", type=float, default=2.5)
+    parser.add_argument("--incumbent-initial-bias", type=float, default=0.0)
+    parser.add_argument("--weakness-bonus", type=float, default=2.0)
+    parser.add_argument("--veto-weight-bonus", type=float, default=1.15)
     parser.add_argument("--train-seed-offset", type=int, default=100_000)
     parser.add_argument("--eval-seed-offset", type=int, default=9_100_000)
     parser.add_argument("--eval-seed-count", type=int, default=2)

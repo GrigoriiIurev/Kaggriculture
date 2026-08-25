@@ -72,12 +72,15 @@ class LeaguePolicyTests(unittest.TestCase):
             "market": [["BUY_PRODUCT", "WHEAT", 2], ["SELL", "MILK", 2]],
         }
 
-        result = apply_market_residual(base, obs, [3, 2, 0, 0])
+        result = apply_market_residual(base, obs, [4, 3, 0, 0])
 
         self.assertEqual(result["farmer"], base["farmer"])
         self.assertEqual(result["market"][0], base["market"][0])
         self.assertEqual(result["market"][1], ["SELL", "MILK", 7])
         self.assertEqual(base["market"][1], ["SELL", "MILK", 2])
+
+        held = apply_market_residual(base, obs, [1, 0, 0, 0])
+        self.assertNotIn(["SELL", "MILK", 2], held["market"])
 
     def test_gate_rejects_veto_collapse(self):
         baseline = {

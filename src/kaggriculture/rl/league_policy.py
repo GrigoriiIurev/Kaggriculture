@@ -7,7 +7,7 @@ import math
 from collections import Counter, deque
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 
@@ -21,10 +21,11 @@ from ..core.game_data import (
 from .meta_policy import MetaControllerAgent, call_agent, normalize_action
 
 
-LEAGUE_POLICY_VERSION = 3
+LEAGUE_POLICY_VERSION = 4
 RESIDUAL_PRODUCTS = ("MILK", "WOOL", "STRAWBERRY", "MELON")
-SALE_FRACTIONS = (0.0, 0.25, 0.5, 1.0)
-ACTION_DIMS = (4, 4, 4, 4)
+ACTION_NAMES = ("KEEP_INCUMBENT", "HOLD", "SELL_25", "SELL_50", "SELL_100")
+TARGET_SALE_FRACTIONS = (None, 0.0, 0.25, 0.5, 1.0)
+ACTION_DIMS = (5, 5, 5, 5)
 HISTORY_LAGS = (1, 4, 24)
 FARM_DELTA_LAGS = (1, 24)
 FARM_METRICS = (
@@ -90,7 +91,13 @@ def _feature_names() -> tuple[str, ...]:
         for metric in FARM_METRICS:
             names.append(f"opponent_delta_{lag}_{metric}")
     for product in RESIDUAL_PRODUCTS:
-        for choice in range(len(SALE_FRACTIONS)):
+        names.extend(
+            [
+                f"available_{product.lower()}",
+                f"incumbent_sell_{product.lower()}",
+            ]
+        )
+        for choice in range(len(ACTION_NAMES)):
             names.append(f"previous_{product.lower()}_{choice}")
     return tuple(names)
 
@@ -202,7 +209,11 @@ class MarketHistoryFeatures:
                 return snapshot
         return self.history[0]
 
-    def extract(self, observation: Mapping[str, Any]) -> np.ndarray:
+    def extract(
+        self,
+        observation: Mapping[str, Any],
+        base_action: Mapping[str, Any] | None = None,
+    ) -> np.ndarray:
         current = _observation_snapshot(observation)
         if not self.history or self.history[-1]["step"] != current["step"]:
             self.history.append(current)
@@ -263,9 +274,22 @@ class MarketHistoryFeatures:
                     if metric == "money"
                     else float(difference) / 25.0
                 )
+        player = int(observation.get("player", 0) or 0)
+        hand_count = len(observation["farms"][player].get("hands", []) or [])
+        normalized = normalize_action(base_action or {}, hand_count)
+        reservations = _pickup_reservations(normalized)
+        incumbent_sales = premium_sell_quantities(normalized)
+        for product in RESIDUAL_PRODUCTS:
+            available = max(
+                0,
+                int(current["shed"].get(product, 0)) - reservations.get(product, 0),
+            )
+            values.extend([available / 100.0, incumbent_sales[product] / 100.0])
         for product_index in range(len(RESIDUAL_PRODUCTS)):
             selected = self.previous_choices[product_index]
-            values.extend(float(choice == selected) for choice in range(len(SALE_FRACTIONS)))
+            values.extend(
+                float(choice == selected) for choice in range(len(ACTION_NAMES))
+            )
         result = np.asarray(values, dtype=np.float32)
         if result.shape != (self.feature_count,):
             raise RuntimeError(
@@ -283,12 +307,47 @@ def _pickup_reservations(action: Mapping[str, Any]) -> Counter[str]:
     return reservations
 
 
+def premium_sell_quantities(action: Mapping[str, Any]) -> Counter[str]:
+    """Return total premium-product quantities in market SELL orders."""
+
+    quantities: Counter[str] = Counter()
+    for order in action.get("market", []) or []:
+        if (
+            isinstance(order, (list, tuple))
+            and len(order) >= 3
+            and order[0] == "SELL"
+            and order[1] in RESIDUAL_PRODUCTS
+        ):
+            quantities[str(order[1])] += max(0, int(order[2]))
+    return quantities
+
+
+def market_decision_available(
+    base_action: Mapping[str, Any], observation: Mapping[str, Any]
+) -> bool:
+    """Whether at least one policy choice can change this turn's orders."""
+
+    player = int(observation.get("player", 0) or 0)
+    hand_count = len(observation["farms"][player].get("hands", []) or [])
+    normalized = normalize_action(base_action, hand_count)
+    incumbent_sales = premium_sell_quantities(normalized)
+    if any(incumbent_sales.values()):
+        return True
+    reservations = _pickup_reservations(normalized)
+    shed = observation.get("private", {}).get("shed", {}) or {}
+    room_for_order = len(normalized["market"]) < 10
+    return room_for_order and any(
+        int(shed.get(product, 0) or 0) - reservations.get(product, 0) > 0
+        for product in RESIDUAL_PRODUCTS
+    )
+
+
 def apply_market_residual(
     base_action: Mapping[str, Any],
     observation: Mapping[str, Any],
     choices: Sequence[int],
 ) -> dict[str, list[Any]]:
-    """Add bounded sales while preserving the incumbent's complete route."""
+    """Override premium sale quantities while preserving every non-sale command."""
 
     if len(choices) != len(RESIDUAL_PRODUCTS):
         raise ValueError("Wrong residual choice count")
@@ -300,29 +359,38 @@ def apply_market_residual(
     reserved = _pickup_reservations(action)
     for product, raw_choice in zip(RESIDUAL_PRODUCTS, choices):
         choice = int(raw_choice)
-        if not 0 <= choice < len(SALE_FRACTIONS):
+        if not 0 <= choice < len(TARGET_SALE_FRACTIONS):
             raise ValueError(f"Invalid residual choice {choice}")
-        fraction = SALE_FRACTIONS[choice]
-        if fraction == 0.0:
+        fraction = TARGET_SALE_FRACTIONS[choice]
+        if fraction is None:
             continue
-        matching = [
-            order
-            for order in market
-            if len(order) >= 3 and order[0] == "SELL" and order[1] == product
-        ]
-        already_selling = sum(max(0, int(order[2])) for order in matching)
         available = max(
             0,
             int(shed.get(product, 0) or 0)
-            - already_selling
             - reserved.get(product, 0),
         )
-        if available <= 0:
-            continue
-        quantity = max(1, int(math.ceil(available * fraction)))
-        if matching:
-            matching[0][2] = int(matching[0][2]) + quantity
-        elif len(market) < 10:
+        quantity = int(math.ceil(available * fraction)) if available else 0
+        matching_indices = [
+            index
+            for index, order in enumerate(market)
+            if len(order) >= 3 and order[0] == "SELL" and order[1] == product
+        ]
+        if matching_indices:
+            first = matching_indices[0]
+            if quantity > 0:
+                market[first] = ["SELL", product, quantity]
+                market = [
+                    order
+                    for index, order in enumerate(market)
+                    if index == first or index not in matching_indices
+                ]
+            else:
+                market = [
+                    order
+                    for index, order in enumerate(market)
+                    if index not in matching_indices
+                ]
+        elif quantity > 0 and len(market) < 10:
             market.append(["SELL", product, quantity])
     action["market"] = market[:10]
     return action
@@ -398,9 +466,9 @@ class LeagueResidualAgent:
         )
         if step == 0:
             self.features.reset()
-        vector = self.features.extract(observation)
-        choices = self.policy.predict(vector)
         base = call_agent(self.incumbent, observation, configuration)
+        vector = self.features.extract(observation, base)
+        choices = self.policy.predict(vector)
         action = apply_market_residual(base, observation, choices)
         self.features.record_action(choices)
         return action

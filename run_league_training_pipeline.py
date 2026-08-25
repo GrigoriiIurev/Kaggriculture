@@ -72,8 +72,8 @@ def main() -> None:
     if not args.incumbent.is_file():
         raise FileNotFoundError(f"Missing incumbent archive: {args.incumbent}")
 
-    output_dir = args.drive_root / "results" / "stage3_league_market"
-    work_dir = args.drive_root / "league" / "stage3_incumbent"
+    output_dir = args.drive_root / "results" / "stage3_league_market_v2"
+    work_dir = args.drive_root / "league" / "stage3_incumbent_v2"
     output_dir.mkdir(parents=True, exist_ok=True)
     print("[1/5] Validating and extracting the immutable incumbent", flush=True)
     if work_dir.exists():
