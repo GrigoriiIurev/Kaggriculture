@@ -16,6 +16,10 @@ from src.kaggriculture.rl.train_league_controller import (
     promotion_gate,
     save_fallback_policy,
 )
+from src.kaggriculture.rl.search_counterfactual_market import (
+    generate_candidates,
+    save_rule_policy,
+)
 
 
 def observation(step=0):
@@ -113,6 +117,35 @@ class LeaguePolicyTests(unittest.TestCase):
         obs["private"]["shed"] = {"MILK": 50, "WOOL": 36}
 
         self.assertEqual(enforce_endgame_liquidation(obs, [1, 2, 0, 3]), (4, 4, 0, 4))
+
+    def test_counterfactual_rule_requires_stock_price_and_no_incumbent_sale(self):
+        configuration = {
+            "minimum_price_ratios": [1.2] * 4,
+            "minimum_stocks": [5] * 4,
+            "sale_choices": [2] * 4,
+            "late_days": [31] * 4,
+            "demand_bonuses": [0.0] * 4,
+            "rising_price_bonuses": [0.0] * 4,
+        }
+        extractor = MarketHistoryFeatures()
+        obs = observation()
+        obs["market"]["prices"]["MILK"] = 240
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rules.npz"
+            save_rule_policy(path, configuration)
+            policy = NumpyLeaguePolicy(path)
+
+            choices = policy.predict(extractor.extract(obs, {"market": []}))
+            self.assertEqual(choices.tolist(), [2, 0, 0, 0])
+
+            extractor.reset()
+            base = {"market": [["SELL", "MILK", 2]]}
+            choices = policy.predict(extractor.extract(obs, base))
+            self.assertEqual(choices.tolist(), [0, 0, 0, 0])
+
+    def test_counterfactual_candidates_are_reproducible(self):
+        self.assertEqual(generate_candidates(10, 7), generate_candidates(10, 7))
+        self.assertEqual(len(generate_candidates(10, 7)), 10)
 
 
 if __name__ == "__main__":

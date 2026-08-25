@@ -32,6 +32,7 @@ ACTION_NAMES = (
 )
 TARGET_SALE_FRACTIONS = (None, 0.25, 0.5, 0.75, 1.0)
 ACTION_DIMS = (5, 5, 5, 5)
+RULE_POLICY_KIND = "counterfactual_market_rules_v1"
 ENDGAME_LIQUIDATION_DAY = 27
 SHED_SAFETY_THRESHOLD = 85
 HISTORY_LAGS = (1, 4, 24)
@@ -111,6 +112,7 @@ def _feature_names() -> tuple[str, ...]:
 
 
 FEATURE_NAMES = _feature_names()
+FEATURE_INDEX = {name: index for index, name in enumerate(FEATURE_NAMES)}
 
 
 def _signed_log(value: float, divisor: float = 10.0) -> float:
@@ -426,20 +428,40 @@ def apply_market_residual(
 
 
 class NumpyLeaguePolicy:
-    """Pure NumPy inference for an SB3 MultiDiscrete actor."""
+    """Dependency-free inference for an MLP or counterfactual rule policy."""
 
     def __init__(self, model_path: str | Path) -> None:
         with np.load(model_path) as payload:
-            self.weights = tuple(
-                (
-                    np.asarray(payload[f"w{index}"], dtype=np.float32),
-                    np.asarray(payload[f"b{index}"], dtype=np.float32),
-                )
-                for index in range(3)
-            )
+            self.policy_kind = str(payload.get("policy_kind", "mlp"))
             self.feature_count = int(payload["feature_count"])
             self.action_dims = tuple(int(value) for value in payload["action_dims"])
             self.policy_version = int(payload.get("policy_version", 0))
+            if self.policy_kind == RULE_POLICY_KIND:
+                self.minimum_price_ratios = np.asarray(
+                    payload["minimum_price_ratios"], dtype=np.float32
+                )
+                self.minimum_stocks = np.asarray(
+                    payload["minimum_stocks"], dtype=np.float32
+                )
+                self.sale_choices = np.asarray(
+                    payload["sale_choices"], dtype=np.int64
+                )
+                self.late_days = np.asarray(payload["late_days"], dtype=np.float32)
+                self.demand_bonuses = np.asarray(
+                    payload["demand_bonuses"], dtype=np.float32
+                )
+                self.rising_price_bonuses = np.asarray(
+                    payload["rising_price_bonuses"], dtype=np.float32
+                )
+                self.weights: tuple[tuple[np.ndarray, np.ndarray], ...] = ()
+            else:
+                self.weights = tuple(
+                    (
+                        np.asarray(payload[f"w{index}"], dtype=np.float32),
+                        np.asarray(payload[f"b{index}"], dtype=np.float32),
+                    )
+                    for index in range(3)
+                )
         if self.policy_version != LEAGUE_POLICY_VERSION:
             raise ValueError(
                 f"League policy version {self.policy_version}; expected {LEAGUE_POLICY_VERSION}"
@@ -448,8 +470,26 @@ class NumpyLeaguePolicy:
             raise ValueError("League feature schema does not match the model")
         if self.action_dims != ACTION_DIMS:
             raise ValueError("League action schema does not match the model")
+        if self.policy_kind == RULE_POLICY_KIND:
+            expected = (len(RESIDUAL_PRODUCTS),)
+            for name in (
+                "minimum_price_ratios",
+                "minimum_stocks",
+                "sale_choices",
+                "late_days",
+                "demand_bonuses",
+                "rising_price_bonuses",
+            ):
+                if getattr(self, name).shape != expected:
+                    raise ValueError(f"Rule policy {name} must have shape {expected}")
+            if np.any(self.sale_choices < 1) or np.any(
+                self.sale_choices >= len(ACTION_NAMES)
+            ):
+                raise ValueError("Rule sale choices must change the incumbent")
 
     def logits(self, features: Sequence[float]) -> np.ndarray:
+        if self.policy_kind == RULE_POLICY_KIND:
+            raise TypeError("Rule policies do not expose neural-network logits")
         value = np.asarray(features, dtype=np.float32)
         if value.shape != (self.feature_count,):
             raise ValueError(f"Expected {self.feature_count} features, got {value.shape}")
@@ -460,6 +500,8 @@ class NumpyLeaguePolicy:
         return value
 
     def predict(self, features: Sequence[float]) -> np.ndarray:
+        if self.policy_kind == RULE_POLICY_KIND:
+            return self._predict_rules(features)
         logits = self.logits(features)
         choices = []
         offset = 0
@@ -467,6 +509,38 @@ class NumpyLeaguePolicy:
             choices.append(int(np.argmax(logits[offset : offset + size])))
             offset += size
         return np.asarray(choices, dtype=np.int64)
+
+    def _predict_rules(self, features: Sequence[float]) -> np.ndarray:
+        values = np.asarray(features, dtype=np.float32)
+        if values.shape != (self.feature_count,):
+            raise ValueError(f"Expected {self.feature_count} features, got {values.shape}")
+        choices = np.zeros(len(RESIDUAL_PRODUCTS), dtype=np.int64)
+        day = float(values[FEATURE_INDEX["day_fraction"]]) * 30.0
+        for index, product in enumerate(RESIDUAL_PRODUCTS):
+            low = product.lower()
+            available = float(values[FEATURE_INDEX[f"available_{low}"]]) * 100.0
+            incumbent_sale = (
+                float(values[FEATURE_INDEX[f"incumbent_sell_{low}"]]) * 100.0
+            )
+            if incumbent_sale > 0.5 or available < self.minimum_stocks[index]:
+                continue
+            if day >= self.late_days[index]:
+                choices[index] = len(ACTION_NAMES) - 1
+                continue
+            price_ratio = float(values[FEATURE_INDEX[f"market_price_{low}"]])
+            demand = float(values[FEATURE_INDEX[f"town_demand_{low}"]]) * 8.0
+            price_rise = max(
+                0.0,
+                float(values[FEATURE_INDEX[f"price_delta_4_{low}"]]),
+            )
+            required_ratio = (
+                self.minimum_price_ratios[index]
+                + self.demand_bonuses[index] * demand
+                + self.rising_price_bonuses[index] * price_rise
+            )
+            if price_ratio >= required_ratio:
+                choices[index] = self.sale_choices[index]
+        return choices
 
 
 class LeagueResidualAgent:
