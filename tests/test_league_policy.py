@@ -10,6 +10,7 @@ from src.kaggriculture.rl.league_policy import (
     MarketHistoryFeatures,
     NumpyLeaguePolicy,
     apply_market_residual,
+    enforce_endgame_liquidation,
 )
 from src.kaggriculture.rl.train_league_controller import (
     promotion_gate,
@@ -100,6 +101,12 @@ class LeaguePolicyTests(unittest.TestCase):
         }
 
         self.assertFalse(promotion_gate(baseline, candidate)["passed"])
+
+    def test_endgame_turns_hold_into_liquidation_but_keeps_fallback(self):
+        obs = observation(27 * 24)
+
+        self.assertEqual(enforce_endgame_liquidation(obs, [1, 2, 3, 4]), (4, 4, 4, 4))
+        self.assertEqual(enforce_endgame_liquidation(obs, [0, 0, 0, 0]), (0, 0, 0, 0))
 
 
 if __name__ == "__main__":

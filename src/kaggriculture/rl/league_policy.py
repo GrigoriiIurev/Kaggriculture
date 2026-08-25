@@ -21,11 +21,12 @@ from ..core.game_data import (
 from .meta_policy import MetaControllerAgent, call_agent, normalize_action
 
 
-LEAGUE_POLICY_VERSION = 4
+LEAGUE_POLICY_VERSION = 5
 RESIDUAL_PRODUCTS = ("MILK", "WOOL", "STRAWBERRY", "MELON")
 ACTION_NAMES = ("KEEP_INCUMBENT", "HOLD", "SELL_25", "SELL_50", "SELL_100")
 TARGET_SALE_FRACTIONS = (None, 0.0, 0.25, 0.5, 1.0)
 ACTION_DIMS = (5, 5, 5, 5)
+ENDGAME_LIQUIDATION_DAY = 27
 HISTORY_LAGS = (1, 4, 24)
 FARM_DELTA_LAGS = (1, 24)
 FARM_METRICS = (
@@ -342,6 +343,26 @@ def market_decision_available(
     )
 
 
+def enforce_endgame_liquidation(
+    observation: Mapping[str, Any], choices: Sequence[int]
+) -> tuple[int, ...]:
+    """Turn every active residual into full liquidation near season end.
+
+    Choice zero remains an exact incumbent fallback. A learned policy therefore
+    cannot hold stock forever, while the safe fallback remains byte-for-byte
+    equivalent in action semantics.
+    """
+
+    normalized = tuple(int(choice) for choice in choices)
+    if len(normalized) != len(RESIDUAL_PRODUCTS):
+        raise ValueError("Wrong residual choice count")
+    day = int(observation.get("day", 0) or 0)
+    if day < ENDGAME_LIQUIDATION_DAY:
+        return normalized
+    sell_all = len(ACTION_NAMES) - 1
+    return tuple(0 if choice == 0 else sell_all for choice in normalized)
+
+
 def apply_market_residual(
     base_action: Mapping[str, Any],
     observation: Mapping[str, Any],
@@ -349,8 +370,7 @@ def apply_market_residual(
 ) -> dict[str, list[Any]]:
     """Override premium sale quantities while preserving every non-sale command."""
 
-    if len(choices) != len(RESIDUAL_PRODUCTS):
-        raise ValueError("Wrong residual choice count")
+    choices = enforce_endgame_liquidation(observation, choices)
     player = int(observation.get("player", 0) or 0)
     hand_count = len(observation["farms"][player].get("hands", []) or [])
     action = normalize_action(copy.deepcopy(base_action), hand_count)
@@ -468,7 +488,9 @@ class LeagueResidualAgent:
             self.features.reset()
         base = call_agent(self.incumbent, observation, configuration)
         vector = self.features.extract(observation, base)
-        choices = self.policy.predict(vector)
+        choices = enforce_endgame_liquidation(
+            observation, self.policy.predict(vector)
+        )
         action = apply_market_residual(base, observation, choices)
         self.features.record_action(choices)
         return action

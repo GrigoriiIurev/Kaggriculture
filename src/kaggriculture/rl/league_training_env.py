@@ -14,6 +14,7 @@ from .league_policy import (
     RESIDUAL_PRODUCTS,
     MarketHistoryFeatures,
     apply_market_residual,
+    enforce_endgame_liquidation,
     market_decision_available,
     premium_sell_quantities,
 )
@@ -41,8 +42,8 @@ class KaggricultureLeagueEnv(gym.Env):
         seed_offset: int = 0,
         fixed_opponent: int | None = None,
         fixed_seat: int | None = None,
-        win_bonus: float = 20.0,
-        market_reward_scale: float = 20.0,
+        win_bonus: float = 50.0,
+        market_reward_scale: float = 200.0,
     ) -> None:
         super().__init__()
         if not opponent_paths:
@@ -141,13 +142,19 @@ class KaggricultureLeagueEnv(gym.Env):
             raise RuntimeError("reset() must be called before step()")
         if self._pending_terminal:
             return self._zero_observation(), 0.0, True, False, self._terminal_info()
-        choices = np.asarray(action, dtype=np.int64)
-        if not self.action_space.contains(choices):
-            raise ValueError(f"Invalid residual action {choices.tolist()}")
+        raw_choices = np.asarray(action, dtype=np.int64)
+        if not self.action_space.contains(raw_choices):
+            raise ValueError(f"Invalid residual action {raw_choices.tolist()}")
         assert self._cached_observation is not None
         assert self._cached_base_action is not None
         assert self._cached_opponent_action is not None
 
+        choices = np.asarray(
+            enforce_endgame_liquidation(
+                self._cached_observation, raw_choices
+            ),
+            dtype=np.int64,
+        )
         base_sales = premium_sell_quantities(self._cached_base_action)
         learner_action = apply_market_residual(
             self._cached_base_action, self._cached_observation, choices
@@ -171,21 +178,25 @@ class KaggricultureLeagueEnv(gym.Env):
         margin = self._money_margin()
         money_reward = (margin - self._previous_margin) / 1000.0
         self._previous_margin = margin
-        reward = money_reward + quality_reward
+        inventory_pressure = self._inventory_pressure()
+        reward = money_reward + quality_reward + inventory_pressure
         info = self._info(None)
         info.update(
             {
                 "choices": choices.tolist(),
+                "raw_choices": raw_choices.tolist(),
                 "residual_effective": effective,
                 "sale_quantity_changes": changes,
                 "market_quality_reward": quality_reward,
                 "money_reward": money_reward,
+                "inventory_pressure": inventory_pressure,
                 "auto_turns": skipped,
             }
         )
         if terminated:
             terminal = self._terminal_info()
             reward += self.win_bonus * int(terminal["outcome"])
+            reward -= min(25.0, float(terminal["terminal_premium_stock"]) / 5.0)
             info.update(terminal)
         return observation, float(reward), terminated, False, info
 
@@ -227,8 +238,23 @@ class KaggricultureLeagueEnv(gym.Env):
             relative_price = float(prices.get(product, 0) or 0) / max(
                 1.0, float(BASE_PRICES[product])
             )
-            raw += int(sales.get(product, 0)) * (relative_price - 1.0)
-        return float(np.clip(raw / self.market_reward_scale, -2.0, 2.0))
+            raw += int(sales.get(product, 0)) * max(0.0, relative_price - 1.0)
+        return float(np.clip(raw / self.market_reward_scale, 0.0, 0.5))
+
+    def _inventory_pressure(self) -> float:
+        """Increasing holding cost that is zero through most of the season."""
+
+        observation = self._observation_for_seat(self._learner_seat)
+        day = int(observation.get("day", 0) or 0)
+        if day < 24:
+            return 0.0
+        shed = observation.get("private", {}).get("shed", {}) or {}
+        stock = sum(
+            max(0, int(shed.get(product, 0) or 0))
+            for product in RESIDUAL_PRODUCTS
+        )
+        urgency = min(1.0, (day - 23) / 6.0)
+        return float(-min(1.5, stock * urgency / 200.0))
 
     def _terminated(self) -> bool:
         assert self._states is not None
@@ -266,7 +292,13 @@ class KaggricultureLeagueEnv(gym.Env):
             "learner_money": self._money(self._learner_seat),
             "opponent_money": self._money(1 - self._learner_seat),
             "money_margin": margin,
+            "terminal_premium_stock": self._premium_stock(),
         }
+
+    def _premium_stock(self) -> int:
+        observation = self._observation_for_seat(self._learner_seat)
+        shed = observation.get("private", {}).get("shed", {}) or {}
+        return sum(max(0, int(shed.get(product, 0) or 0)) for product in RESIDUAL_PRODUCTS)
 
     def _info(self, game_seed: int | None) -> dict[str, Any]:
         info = {

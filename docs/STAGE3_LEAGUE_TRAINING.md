@@ -20,8 +20,10 @@ The observation includes current public state, the private inventory available
 to the agent, market price/inventory changes over 1, 4, and 24 turns, and public
 opponent-farm changes over 1 and 24 turns. PPO acts only when a sale can actually
 be changed. For each premium product it can keep the incumbent command, hold the
-product, or sell 25%, 50%, or 100%. The reward combines the final money result
-with the quality of prices at which stock was actually sold.
+product, or sell 25%, 50%, or 100%. Only sales above the base price receive a
+small quality bonus; cheap sales are no longer punished. Holding inventory gains
+an increasing cost late in the season, and every non-fallback choice becomes a
+full liquidation during the final three days.
 
 Every evaluation uses the same seeds and both seats for the unchanged incumbent
 and the candidate. A candidate is promoted only if it has no runtime errors,
@@ -38,7 +40,7 @@ Open `kaggriculture_stage3_league_training_colab.ipynb`. Google Drive is mounted
 in the first cell, and the long-running cell streams every output line both to
 the notebook and to:
 
-`MyDrive/Kaggriculture/results/stage3_league_market_v2/pipeline.log`
+`MyDrive/Kaggriculture/results/stage3_league_market_v3/pipeline.log`
 
 The final archive and reports are written to the same directory. Kaggle upload
 is disabled by default; set `SUBMIT_TO_KAGGLE = True` only after reviewing the

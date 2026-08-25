@@ -250,6 +250,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError("Environment and evaluation counts must be positive")
     if args.weakness_bonus < 0 or args.veto_weight_bonus <= 0:
         raise ValueError("Curriculum weight multipliers must be non-negative")
+    if not 0 < args.catastrophic_score_drop <= 1:
+        raise ValueError("catastrophic_score_drop must be in (0, 1]")
     print("[setup] Loading league and RL libraries", flush=True)
     try:
         import torch
@@ -269,6 +271,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     last_numpy = args.output_dir / "last_league_policy.npz"
     last_model = args.output_dir / "last_league_ppo_model.zip"
     best_model = args.output_dir / "best_league_ppo_model.zip"
+    anchor_model = args.output_dir / "safe_training_anchor.zip"
     report_path = args.output_dir / "league_training_report.json"
     if not fallback.is_file():
         save_fallback_policy(fallback)
@@ -340,7 +343,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             batch_size=args.batch_size,
             n_epochs=args.ppo_epochs,
             gamma=1.0,
-            gae_lambda=0.95,
+            gae_lambda=1.0,
             ent_coef=args.entropy,
             verbose=1,
             device=args.device,
@@ -357,6 +360,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "still protects the incumbent",
             flush=True,
         )
+        model.save(anchor_model)
+        print(f"[train] Saved initial safety anchor {anchor_model}", flush=True)
+    if not anchor_model.is_file():
+        model.save(anchor_model)
 
     class ProgressCallback(BaseCallback):
         def __init__(self, interval: int, checkpoint_interval: int) -> None:
@@ -452,7 +459,21 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             shutil.copy2(last_model, best_model)
             best_candidate = candidate
             best_ranking = ranking
+            model.save(anchor_model)
             print("[promotion] Saved a policy stronger than the incumbent", flush=True)
+        elif (
+            baseline["score_rate"] - candidate["score_rate"]
+            >= args.catastrophic_score_drop
+        ):
+            print(
+                "[rollback] Catastrophic evaluation; restoring the last safe "
+                "training anchor",
+                flush=True,
+            )
+            model = PPO.load(
+                anchor_model, env=vector_environment, device=args.device
+            )
+            model.save(last_model)
 
         report = {
             "schema_version": 1,
@@ -479,7 +500,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--incumbent", type=Path, required=True)
     parser.add_argument("--opponent-pool", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--steps-per-round", type=int, default=50_000)
+    parser.add_argument("--steps-per-round", type=int, default=25_000)
     parser.add_argument("--max-rounds", type=int, default=4)
     parser.add_argument("--train-envs", type=int, default=2)
     parser.add_argument("--episode-steps", type=int, default=720)
@@ -487,10 +508,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=512)
     parser.add_argument("--ppo-epochs", type=int, default=5)
     parser.add_argument("--learning-rate", type=float, default=2e-4)
-    parser.add_argument("--entropy", type=float, default=0.01)
-    parser.add_argument("--incumbent-initial-bias", type=float, default=0.0)
+    parser.add_argument("--entropy", type=float, default=0.005)
+    parser.add_argument("--incumbent-initial-bias", type=float, default=0.2)
     parser.add_argument("--weakness-bonus", type=float, default=2.0)
     parser.add_argument("--veto-weight-bonus", type=float, default=1.15)
+    parser.add_argument("--catastrophic-score-drop", type=float, default=0.25)
     parser.add_argument("--train-seed-offset", type=int, default=100_000)
     parser.add_argument("--eval-seed-offset", type=int, default=9_100_000)
     parser.add_argument("--eval-seed-count", type=int, default=2)
